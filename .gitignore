@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+.env
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.env.*.local
+.vercel
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+npm-debug.log*
+yarn-error.log*

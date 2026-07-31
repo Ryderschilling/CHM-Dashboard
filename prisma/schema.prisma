@@ -1,0 +1,224 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum ClientStatus {
+  LEAD
+  ACTIVE
+  PAUSED
+  FORMER
+}
+
+enum BillingCadence {
+  MONTHLY
+  PER_VISIT
+  AD_HOC
+}
+
+enum PaymentStatus {
+  PAID
+  DUE
+  UPCOMING
+}
+
+enum PaymentMethod {
+  SQUARE
+  CASH
+  CHECK
+  VENMO
+  ZELLE
+  OTHER
+}
+
+enum PaymentCategory {
+  RETAINER
+  A_LA_CARTE
+  PROJECT
+  ADD_ON
+  OTHER
+}
+
+enum JobStatus {
+  SCHEDULED
+  DONE
+  CANCELED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+enum ExpenseCategory {
+  LABOR
+  SUPPLIES
+  GAS
+  SOFTWARE
+  INSURANCE
+  MARKETING
+  OTHER
+}
+
+model Client {
+  id          String         @id @default(cuid())
+  name        String
+  status      ClientStatus   @default(ACTIVE)
+  email       String?
+  phone       String?
+  altContact  String?
+  community   String?
+  planName    String?
+  planAmount  Decimal?       @db.Decimal(10, 2)
+  cadence     BillingCadence @default(MONTHLY)
+  lockedRate  Boolean        @default(false)
+  lockedUntil DateTime?
+  startDate   DateTime?
+  source      String?
+  squareCustomerId String?
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  properties  Property[]
+  payments    Payment[]
+  jobs        Job[]
+  tasks       Task[]
+  logs        Note[]
+  squareLinks SquareLink[]
+  expenses    Expense[]
+}
+
+model Property {
+  id           String  @id @default(cuid())
+  clientId     String
+  client       Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  label        String?
+  address      String
+  gateCode     String?
+  doorCode     String?
+  alarmCode    String?
+  wifiName     String?
+  wifiPassword String?
+  keyLocation  String?
+  trashDay     String?
+  hvacNotes    String?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  jobs Job[]
+}
+
+model Payment {
+  id              String          @id @default(cuid())
+  clientId        String?
+  client          Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  amount          Decimal         @db.Decimal(10, 2)
+  status          PaymentStatus   @default(PAID)
+  dueDate         DateTime?
+  paidDate        DateTime?
+  method          PaymentMethod?
+  category        PaymentCategory @default(RETAINER)
+  description     String?
+  invoiceNumber   String?
+  squareInvoiceId String?
+  expenses        Expense[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model Worker {
+  id         String    @id @default(cuid())
+  name       String
+  phone      String?
+  email      String?
+  defaultPay Decimal?  @db.Decimal(10, 2)
+  payNote    String?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  jobs     Job[]
+  expenses Expense[]
+}
+
+model Job {
+  id           String    @id @default(cuid())
+  clientId     String?
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  propertyId   String?
+  property     Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  title        String
+  jobType      String?
+  date         DateTime
+  status       JobStatus @default(SCHEDULED)
+  workerId     String?
+  worker       Worker?   @relation(fields: [workerId], references: [id], onDelete: SetNull)
+  laborCost    Decimal   @default(0) @db.Decimal(10, 2)
+  chargeAmount Decimal?  @db.Decimal(10, 2)
+  durationMin  Int?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Task {
+  id        String       @id @default(cuid())
+  title     String
+  done      Boolean      @default(false)
+  dueDate   DateTime?
+  priority  TaskPriority @default(NORMAL)
+  clientId  String?
+  client    Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  notes     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  date        DateTime
+  amount      Decimal         @db.Decimal(10, 2)
+  category    ExpenseCategory @default(OTHER)
+  vendor      String?
+  description String?
+  workerId    String?
+  worker      Worker?         @relation(fields: [workerId], references: [id], onDelete: SetNull)
+  /// Optional link to the invoice/payment this cost belongs to,
+  /// so per-invoice profit = payment amount minus its linked expenses.
+  paymentId   String?
+  payment     Payment?        @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  /// Optional link to a client, so per-client cost and true spread work.
+  /// Auto-filled from the invoice's client when attached to a payment.
+  clientId    String?
+  client      Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+}
+
+/// Maps Square customer IDs to clients. One client can own several
+/// Square records (spouses, duplicate directory entries).
+model SquareLink {
+  squareCustomerId String @id
+  clientId         String
+  client           Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+/// Tiny key-value store (last Square sync time, etc).
+model AppState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
