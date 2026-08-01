@@ -12,13 +12,9 @@ export default function LoginPage() {
     <main className="min-h-dvh flex items-center justify-center aurora px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-5 bg-[var(--teal)]">
-            <span className="display font-bold text-xl text-[var(--teal-ink)]">C</span>
-          </div>
-          <h1 className="display font-semibold text-3xl tracking-tight" style={{ fontStretch: "118%" }}>
-            CHM OPS
-          </h1>
-          <p className="text-[var(--mut)] text-sm mt-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/chm-logo.png" alt="CHM" className="h-[52px] w-auto mx-auto mb-4" />
+          <p className="text-[var(--mut)] text-sm">
             Coastal Home Management 30A command center
           </p>
         </div>

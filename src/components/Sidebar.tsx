@@ -34,17 +34,11 @@ export default function Sidebar() {
     <>
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-60 flex-col border-r border-[var(--border)] bg-[var(--surface)]/60 backdrop-blur z-50">
-        <Link href="/" className="flex items-center gap-3 px-5 pt-6 pb-7">
-          <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-[var(--teal)]">
-            <span className="display font-bold text-sm text-[var(--teal-ink)]">C</span>
-          </span>
-          <span>
-            <span className="display block font-semibold text-[15px] leading-tight" style={{ fontStretch: "115%" }}>
-              CHM OPS
-            </span>
-            <span className="block text-[11px] text-[var(--mut)] leading-tight">
-              Coastal Home Mgmt 30A
-            </span>
+        <Link href="/" className="block px-5 pt-7 pb-7">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/chm-logo.png" alt="CHM" className="h-[24px] w-auto" />
+          <span className="block text-[10.5px] text-[var(--mut)] mt-2 tracking-wide">
+            Coastal Home Mgmt 30A · Ops
           </span>
         </Link>
 
