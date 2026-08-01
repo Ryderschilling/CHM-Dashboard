@@ -16,6 +16,7 @@ import InvoiceCosts from "@/components/InvoiceCosts";
 import { TaskToggle, TaskDelete, NoteComposer, NoteDelete } from "@/components/TaskBits";
 import { SectionHeader, StatusBadge, Empty, CADENCE_LABEL, CATEGORY_LABEL } from "@/components/ui";
 import StatTile from "@/components/StatTile";
+import { valueJobs, fmtHours } from "@/lib/jobValue";
 import Reveal from "@/components/Reveal";
 import { IconChevronL } from "@/components/icons";
 
@@ -61,6 +62,19 @@ export default async function ClientDetail({
     _sum: { amount: true },
   });
   const costsYtd = num(costsYtdAgg._sum.amount);
+
+  // Per-visit value needs the client's plan, which lives on the client record here.
+  const jobValues = valueJobs(
+    client.jobs.map((j) => ({
+      id: j.id,
+      clientId: client.id,
+      date: j.date,
+      chargeAmount: j.chargeAmount,
+      laborCost: j.laborCost,
+      laborHours: j.laborHours,
+      client: { cadence: client.cadence, planAmount: client.planAmount },
+    }))
+  );
 
   const clientDefaults = {
     id: client.id,
@@ -134,7 +148,7 @@ export default async function ClientDetail({
           subTone={due.some((p) => isOverdue(p.dueDate)) ? "bad" : "mut"}
         />
         <StatTile
-          label="Spread this year"
+          label="Profit this year"
           value={ytd - laborYtd - costsYtd}
           money
           sub="Collected minus labor and job costs"
@@ -225,6 +239,36 @@ export default async function ClientDetail({
               {client.logs.length === 0 && <p className="text-[12.5px] text-[var(--mut)] pt-1">Nothing logged yet.</p>}
             </div>
           </div>
+
+          {/* Tasks */}
+          <div className="card p-5">
+            <SectionHeader
+              title="Tasks"
+              action={<AddTaskButton clients={allClients} fixedClientId={client.id} primary={false} />}
+            />
+            {client.tasks.length ? (
+              <div className="space-y-2">
+                {client.tasks.map((t) => (
+                  <div key={t.id} className="flex items-center gap-3 group">
+                    <TaskToggle id={t.id} done={t.done} />
+                    <span className={`flex-1 text-[13.5px] ${t.done ? "line-through text-[var(--mut)]" : ""}`}>
+                      {t.title}
+                    </span>
+                    {t.dueDate && !t.done && (
+                      <span className={`text-[11.5px] ${isOverdue(t.dueDate) ? "text-[var(--bad)]" : "text-[var(--mut)]"}`}>
+                        {fmtDate(t.dueDate)}
+                      </span>
+                    )}
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <TaskDelete id={t.id} />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Empty text="No tasks tied to this client." />
+            )}
+          </div>
         </div>
 
         {/* Right column */}
@@ -313,16 +357,16 @@ export default async function ClientDetail({
             {client.jobs.length ? (
               <div className="space-y-1">
                 {client.jobs.map((j) => {
-                  const spread = (j.chargeAmount == null ? 0 : num(j.chargeAmount)) - num(j.laborCost);
+                  const v = jobValues.get(j.id);
                   return (
                     <div key={j.id} className="flex items-center justify-between gap-3 py-2 border-b border-[var(--border)] last:border-0">
                       <div className="min-w-0">
                         <p className="text-[13.5px] font-medium truncate">{j.title}</p>
                         <p className="text-[12px] text-[var(--mut)]">
                           {fmtDate(j.date)} · {j.worker?.name ?? "You"}
-                          {num(j.laborCost) > 0 ? ` · labor ${money(j.laborCost)}` : ""}
-                          {j.chargeAmount != null ? ` · charge ${money(j.chargeAmount)}` : ""}
-                          {j.chargeAmount != null && spread !== 0 ? ` · spread ${money(spread)}` : ""}
+                          {v?.hours ? ` · ${fmtHours(v.hours)}` : ""}
+                          {v && v.value > 0 ? ` · ${money(v.value)}${v.fromPlan ? " plan" : ""}` : ""}
+                          {v && v.labor > 0 ? ` · paid out ${money(v.labor)} · net ${money(v.profit)}` : ""}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -341,6 +385,7 @@ export default async function ClientDetail({
                             status: j.status,
                             workerId: j.workerId,
                             laborCost: num(j.laborCost),
+                            laborHours: j.laborHours == null ? null : num(j.laborHours),
                             chargeAmount: j.chargeAmount == null ? null : num(j.chargeAmount),
                             durationMin: j.durationMin,
                             notes: j.notes,
@@ -356,35 +401,6 @@ export default async function ClientDetail({
             )}
           </div>
 
-          {/* Tasks */}
-          <div className="card p-5">
-            <SectionHeader
-              title="Tasks"
-              action={<AddTaskButton clients={allClients} fixedClientId={client.id} primary={false} />}
-            />
-            {client.tasks.length ? (
-              <div className="space-y-2">
-                {client.tasks.map((t) => (
-                  <div key={t.id} className="flex items-center gap-3 group">
-                    <TaskToggle id={t.id} done={t.done} />
-                    <span className={`flex-1 text-[13.5px] ${t.done ? "line-through text-[var(--mut)]" : ""}`}>
-                      {t.title}
-                    </span>
-                    {t.dueDate && !t.done && (
-                      <span className={`text-[11.5px] ${isOverdue(t.dueDate) ? "text-[var(--bad)]" : "text-[var(--mut)]"}`}>
-                        {fmtDate(t.dueDate)}
-                      </span>
-                    )}
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <TaskDelete id={t.id} />
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Empty text="No tasks tied to this client." />
-            )}
-          </div>
         </div>
       </div>
     </Reveal>

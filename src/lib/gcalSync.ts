@@ -87,7 +87,8 @@ function buildDescription(job: JobForPush): string {
   if (job.client?.name) lines.push(`Client: ${job.client.name}`);
   lines.push(`Who: ${job.worker?.name ?? "Ryder"}`);
   if (job.chargeAmount != null) lines.push(`Charge: $${Number(job.chargeAmount).toFixed(2)}`);
-  if (Number(job.laborCost) > 0) lines.push(`Labor: $${Number(job.laborCost).toFixed(2)}`);
+  if (Number(job.laborCost) > 0) lines.push(`Paid out: $${Number(job.laborCost).toFixed(2)}`);
+  if (job.laborHours != null && Number(job.laborHours) > 0) lines.push(`Time: ${Number(job.laborHours)}h`);
   if (job.status !== "SCHEDULED") lines.push(`Status: ${job.status}`);
   if (job.tasks?.length) {
     lines.push("Checklist:");
@@ -153,16 +154,22 @@ function matchClient(e: GEvent, clients: ClientLite[], byId: Set<string>): strin
     .sort((a, b) => b.name.length - a.name.length)[0];
   if (full) return full.id;
 
-  // Fall back to a distinctive surname: 5+ chars and owned by exactly one client.
+  // Fall back to any single name part that is 4+ chars, appears in the title as a
+  // whole word, and belongs to exactly one client. Catches "Becky House Check"
+  // and "Tedesco Mail" alike. Bails out if two different clients both match.
   let found: string | null = null;
   for (const c of clients) {
-    const last = c.name.trim().split(/\s+/).pop() ?? "";
-    if (last.length < 5) continue;
-    if (!hay.includes(last.toLowerCase())) continue;
-    const owners = clients.filter((o) => (o.name.trim().split(/\s+/).pop() ?? "").toLowerCase() === last.toLowerCase());
-    if (owners.length !== 1) continue;
-    if (found) return null; // two different surnames matched, too ambiguous
-    found = c.id;
+    for (const part of c.name.trim().split(/\s+/)) {
+      if (part.length < 4) continue;
+      const word = part.toLowerCase();
+      if (!new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(hay)) continue;
+      const owners = clients.filter((o) =>
+        o.name.toLowerCase().split(/\s+/).includes(word)
+      );
+      if (owners.length !== 1) continue;
+      if (found && found !== c.id) return null; // ambiguous across clients
+      found = c.id;
+    }
   }
   return found;
 }

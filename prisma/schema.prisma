@@ -159,7 +159,12 @@ model Job {
   status       JobStatus @default(SCHEDULED)
   workerId     String?
   worker       Worker?   @relation(fields: [workerId], references: [id], onDelete: SetNull)
+  /// What was actually paid out to a worker for this job. 0 when Ryder did it.
   laborCost    Decimal   @default(0) @db.Decimal(10, 2)
+  /// Time on the job, tracked whether or not anyone was paid.
+  laborHours   Decimal?  @db.Decimal(6, 2)
+  /// Explicit one-off charge. Leave null when the visit is covered by a plan;
+  /// lib/jobValue.ts then allocates a share of the client's monthly plan.
   chargeAmount Decimal?  @db.Decimal(10, 2)
   durationMin  Int?
   notes        String?

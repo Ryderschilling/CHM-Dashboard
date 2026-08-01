@@ -20,6 +20,7 @@ export type JobDefaults = {
   status?: string;
   workerId?: string | null;
   laborCost?: number;
+  laborHours?: number | null;
   chargeAmount?: number | null;
   durationMin?: number | null;
   notes?: string | null;
@@ -119,11 +120,14 @@ export default function JobForm({
             <option value="CANCELED">Canceled</option>
           </select>
         </Field>
-        <Field label="Labor cost ($, what you pay out)">
+        <Field label="Time on the job (hours)">
+          <input name="laborHours" type="number" step="0.25" min="0" defaultValue={defaults.laborHours ?? ""} className="input" placeholder="0.75" />
+        </Field>
+        <Field label="Paid out ($, only if someone else did it)">
           <input name="laborCost" type="number" step="0.01" min="0" defaultValue={defaults.laborCost ?? ""} className="input" placeholder="0" />
         </Field>
-        <Field label="Charge ($, what the client pays)">
-          <input name="chargeAmount" type="number" step="0.01" min="0" defaultValue={defaults.chargeAmount ?? ""} className="input" placeholder="Blank if covered by plan" />
+        <Field label="One-off charge ($)" className="sm:col-span-2">
+          <input name="chargeAmount" type="number" step="0.01" min="0" defaultValue={defaults.chargeAmount ?? ""} className="input" placeholder="Leave blank when the plan covers it" />
         </Field>
       </FormGrid>
 

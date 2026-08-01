@@ -78,3 +78,18 @@ export function isOverdue(dueDate: Date | string | null | undefined): boolean {
   startOfToday.setHours(0, 0, 0, 0);
   return dt.getTime() < startOfToday.getTime();
 }
+
+/** Parse a "2026-08" query param into the first of that month. Falls back to now. */
+export function parseMonthParam(m?: string): Date {
+  if (m) {
+    const match = m.match(/^(\d{4})-(\d{2})$/);
+    if (match) return new Date(Number(match[1]), Number(match[2]) - 1, 1);
+  }
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+/** "2026-08" for a month, for building links. */
+export function monthParam(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}

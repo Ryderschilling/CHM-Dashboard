@@ -35,6 +35,7 @@ function jobData(fd: FormData) {
     status: (str(fd, "status") ?? "SCHEDULED") as JobStatus,
     workerId: str(fd, "workerId"),
     laborCost: numOr0(fd, "laborCost"),
+    laborHours: numOrNull(fd, "laborHours"),
     chargeAmount: numOrNull(fd, "chargeAmount"),
     durationMin: numOrNull(fd, "durationMin"),
     notes: str(fd, "notes"),
@@ -68,11 +69,12 @@ export async function deleteJob(fd: FormData) {
 export async function completeJob(fd: FormData) {
   const id = reqStr(fd, "id");
   const laborCost = numOr0(fd, "laborCost");
+  const laborHours = numOrNull(fd, "laborHours");
   const chargeAmount = numOrNull(fd, "chargeAmount");
 
   const job = await prisma.job.update({
     where: { id },
-    data: { status: "DONE", laborCost, chargeAmount },
+    data: { status: "DONE", laborCost, laborHours, chargeAmount },
   });
 
   if (bool(fd, "billClient") && chargeAmount && job.clientId) {

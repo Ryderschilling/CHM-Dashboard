@@ -160,11 +160,14 @@ function CompleteJobModal({
         <input type="hidden" name="id" value={job.id} />
         <p className="text-[13.5px] text-[var(--sec)] -mt-1">{job.title}</p>
         <FormGrid>
-          <Field label="Labor cost ($, what you pay out)">
-            <input name="laborCost" type="number" step="0.01" min="0" autoFocus defaultValue={job.laborCost || ""} className="input" placeholder="0 if you did it" />
+          <Field label="Time on the job (hours)">
+            <input name="laborHours" type="number" step="0.25" min="0" autoFocus defaultValue={job.laborHours ?? ""} className="input" placeholder="0.75" />
           </Field>
-          <Field label="Charge to client ($)">
-            <input name="chargeAmount" type="number" step="0.01" min="0" defaultValue={job.chargeAmount ?? ""} className="input" placeholder="Blank if covered by plan" />
+          <Field label="Paid out ($)">
+            <input name="laborCost" type="number" step="0.01" min="0" defaultValue={job.laborCost || ""} className="input" placeholder="0 if you did it" />
+          </Field>
+          <Field label="One-off charge ($)" className="sm:col-span-2">
+            <input name="chargeAmount" type="number" step="0.01" min="0" defaultValue={job.chargeAmount ?? ""} className="input" placeholder="Leave blank when the plan covers it" />
           </Field>
         </FormGrid>
         <label className="flex items-center gap-2.5 text-[13.5px] text-[var(--sec)]">

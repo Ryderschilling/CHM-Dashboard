@@ -5,11 +5,23 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 export type DashboardData = Awaited<ReturnType<typeof getDashboard>>;
 
-export async function getDashboard() {
+/**
+ * Everything the Command Center renders.
+ *
+ * `month` scopes the money tiles (collected, waiting on, labor, profit) and the
+ * top-client list. It does NOT scope MRR, active client count, the trend charts,
+ * or Coming up / Needs attention: those are "right now" facts and would be
+ * nonsense pinned to a past month.
+ */
+export async function getDashboard(month?: Date) {
   const now = new Date();
-  const thisMonth = monthStart(0);
-  const chartStart = monthStart(-11);
-  const yearStart = new Date(now.getFullYear(), 0, 1);
+  const thisMonth = month ?? monthStart(0);
+  const nextMonth = new Date(thisMonth.getFullYear(), thisMonth.getMonth() + 1, 1);
+  const isCurrentMonth =
+    thisMonth.getFullYear() === now.getFullYear() && thisMonth.getMonth() === now.getMonth();
+  // Reach back far enough to cover both the rolling charts and any older month picked.
+  const rollingStart = monthStart(-11);
+  const chartStart = thisMonth < rollingStart ? thisMonth : rollingStart;
 
   const [activeClients, payments, jobs, expenses, openTasks, activeCount] = await Promise.all([
     prisma.client.findMany({
@@ -56,21 +68,33 @@ export async function getDashboard() {
   const due = payments.filter((p) => p.status === "DUE");
   const upcomingPayments = payments.filter((p) => p.status === "UPCOMING");
 
+  const inMonth = (d: Date) => d >= thisMonth && d < nextMonth;
+
   const collectedMTD = paid
-    .filter((p) => (p.paidDate as Date) >= thisMonth)
+    .filter((p) => inMonth(p.paidDate as Date))
     .reduce((s, p) => s + num(p.amount), 0);
 
-  const outstanding = due.reduce((s, p) => s + num(p.amount), 0);
-  const upcomingSum = upcomingPayments.reduce((s, p) => s + num(p.amount), 0);
-  const overdueList = due.filter((p) => isOverdue(p.dueDate));
+  // Same rule as the Money page: in the current month, unpaid invoices from
+  // earlier roll forward because that money is still owed today. Other months
+  // are scoped strictly to what was due in them.
+  const scopeUnpaid = <T extends { dueDate: Date | null }>(rows: T[]) =>
+    isCurrentMonth
+      ? rows.filter((p) => !p.dueDate || p.dueDate < nextMonth)
+      : rows.filter((p) => p.dueDate && p.dueDate >= thisMonth && p.dueDate < nextMonth);
+
+  const dueScoped = scopeUnpaid(due);
+  const upcomingScoped = scopeUnpaid(upcomingPayments);
+  const outstanding = dueScoped.reduce((s, p) => s + num(p.amount), 0);
+  const upcomingSum = upcomingScoped.reduce((s, p) => s + num(p.amount), 0);
+  const overdueList = dueScoped.filter((p) => isOverdue(p.dueDate));
   const overdue = overdueList.reduce((s, p) => s + num(p.amount), 0);
 
   const doneJobs = jobs.filter((j) => j.status === "DONE");
   const laborMTD = doneJobs
-    .filter((j) => j.date >= thisMonth)
+    .filter((j) => inMonth(j.date))
     .reduce((s, j) => s + num(j.laborCost), 0);
   const expensesMTD = expenses
-    .filter((e) => e.date >= thisMonth)
+    .filter((e) => inMonth(e.date))
     .reduce((s, e) => s + num(e.amount), 0);
   const profitMTD = collectedMTD - laborMTD - expensesMTD;
 
@@ -99,15 +123,22 @@ export async function getDashboard() {
   const mrrAvgMonths = profitMonths.length;
   const mrrDeltaPct = mrrAvg > 0 ? ((mrr - mrrAvg) / mrrAvg) * 100 : null;
 
-  // Revenue by month, last 12
-  const revenue12: { label: string; a: number }[] = [];
+  // Profit by month, last 12. Collected minus job labor minus expenses, so the
+  // headline chart shows what he actually kept rather than what came in.
+  const profit12: { label: string; a: number }[] = [];
   for (let i = 11; i >= 0; i--) {
     const m = monthStart(-i);
     const key = monthKey(m);
-    const total = paid
+    const moneyIn = paid
       .filter((p) => monthKey(p.paidDate as Date) === key)
       .reduce((s, p) => s + num(p.amount), 0);
-    revenue12.push({ label: MONTHS[m.getMonth()], a: total });
+    const labor = jobs
+      .filter((j) => j.status === "DONE" && monthKey(j.date) === key)
+      .reduce((s, j) => s + num(j.laborCost), 0);
+    const exp = expenses
+      .filter((e) => monthKey(e.date) === key)
+      .reduce((s, e) => s + num(e.amount), 0);
+    profit12.push({ label: MONTHS[m.getMonth()], a: moneyIn - labor - exp });
   }
 
   // Money in vs costs, last 6 months
@@ -127,10 +158,10 @@ export async function getDashboard() {
     inOut6.push({ label: MONTHS[m.getMonth()], a: moneyIn, b: labor + exp });
   }
 
-  // Top clients by collected revenue, YTD
+  // Top clients by collected revenue in the selected month
   const byClient = new Map<string, { label: string; value: number }>();
   for (const p of paid) {
-    if ((p.paidDate as Date) < yearStart) continue;
+    if (!inMonth(p.paidDate as Date)) continue;
     const key = p.client?.id ?? "none";
     const label = p.client?.name ?? "No client";
     const cur = byClient.get(key) ?? { label, value: 0 };
@@ -170,6 +201,8 @@ export async function getDashboard() {
   ].slice(0, 6);
 
   return {
+    month: thisMonth,
+    isCurrentMonth,
     mrr,
     mrrAvg,
     mrrAvgMonths,
@@ -184,7 +217,7 @@ export async function getDashboard() {
     expensesMTD,
     profitMTD,
     activeCount,
-    revenue12,
+    profit12,
     inOut6,
     topClients,
     upcomingJobs,

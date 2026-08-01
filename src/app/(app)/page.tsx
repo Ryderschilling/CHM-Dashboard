@@ -1,21 +1,31 @@
 import Link from "next/link";
 import { getDashboard } from "@/lib/metrics";
 import { getCalendarEvents, calendarConfigured } from "@/lib/gcal";
-import { money, fmtDate, fmtTime } from "@/lib/format";
+import { money, fmtDate, fmtTime, fmtMonth, parseMonthParam, monthParam } from "@/lib/format";
 import StatTile from "@/components/StatTile";
 import Reveal from "@/components/Reveal";
 import BarChart from "@/components/charts/BarChart";
 import HBarList from "@/components/charts/HBarList";
 import { SectionHeader, Empty, StatusBadge } from "@/components/ui";
-import { IconAlert, IconArrowRight } from "@/components/icons";
+import { IconAlert, IconArrowRight, IconChevronL, IconChevronR } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
 const DAY_GREETING = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-export default async function Dashboard() {
-  const [d, calEvents] = await Promise.all([getDashboard(), getCalendarEvents(10)]);
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ m?: string }>;
+}) {
+  const sp = await searchParams;
+  const month = parseMonthParam(sp.m);
+  const prevMonth = new Date(month.getFullYear(), month.getMonth() - 1, 1);
+  const nextMonth = new Date(month.getFullYear(), month.getMonth() + 1, 1);
+
+  const [d, calEvents] = await Promise.all([getDashboard(month), getCalendarEvents(10)]);
   const now = new Date();
+  const monthName = fmtMonth(month);
 
   const agenda = [
     ...d.upcomingJobs.map((j) => ({
@@ -55,6 +65,23 @@ export default async function Dashboard() {
         </div>
       </Reveal>
 
+      {/* Month filter */}
+      <Reveal delay={40}>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-1">
+            <Link href={`/?m=${monthParam(prevMonth)}`} className="btn btn-sm"><IconChevronL size={14} /></Link>
+            <span className="display font-semibold text-[15px] px-2 min-w-[110px] text-center" style={{ fontStretch: "112%" }}>
+              {monthName}
+            </span>
+            <Link href={`/?m=${monthParam(nextMonth)}`} className="btn btn-sm"><IconChevronR size={14} /></Link>
+            {!d.isCurrentMonth && <Link href="/" className="btn btn-sm ml-1.5">This month</Link>}
+          </div>
+          <p className="text-[11.5px] text-[var(--mut)]">
+            Money tiles follow this month. MRR, client count, and the charts are always current.
+          </p>
+        </div>
+      </Reveal>
+
       {/* Stat tiles */}
       <Reveal delay={60}>
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
@@ -80,7 +107,7 @@ export default async function Dashboard() {
             }
             subTone={d.missingPlanAmounts > 0 ? "warn" : "mut"}
           />
-          <StatTile label="Collected this month" value={d.collectedMTD} money sub="Money actually in" />
+          <StatTile label={`Collected ${monthName}`} value={d.collectedMTD} money sub="Money actually in" />
           <StatTile
             label="Waiting on"
             value={d.outstanding}
@@ -90,18 +117,20 @@ export default async function Dashboard() {
                 ? `${money(d.overdue)} overdue`
                 : d.upcomingSum > 0
                   ? `+${money(d.upcomingSum)} scheduled soon`
-                  : "Nothing overdue"
+                  : d.isCurrentMonth
+                    ? "Nothing overdue"
+                    : `Nothing was due in ${monthName}`
             }
             subTone={d.overdueCount > 0 ? "bad" : d.upcomingSum > 0 ? "mut" : "good"}
           />
           <StatTile
-            label="Profit this month"
+            label={`Profit ${monthName}`}
             value={d.profitMTD}
             money
             sub="After labor and expenses"
             subTone={d.profitMTD >= 0 ? "good" : "bad"}
           />
-          <StatTile label="Labor + expenses" value={d.laborMTD + d.expensesMTD} money sub="Cost this month" />
+          <StatTile label="Labor + expenses" value={d.laborMTD + d.expensesMTD} money sub={`Cost in ${monthName}`} />
           <StatTile label="Active clients" value={d.activeCount} sub="Recurring and a la carte" />
         </div>
       </Reveal>
@@ -110,8 +139,8 @@ export default async function Dashboard() {
       <div className="grid lg:grid-cols-2 gap-4 mb-4">
         <Reveal delay={100}>
           <div className="card p-5">
-            <SectionHeader title="Revenue" sub="Collected by month, last 12 months" />
-            <BarChart data={d.revenue12} seriesA="Collected" />
+            <SectionHeader title="Profit" sub="Collected minus labor and expenses, last 12 months" />
+            <BarChart data={d.profit12} seriesA="Profit" />
           </div>
         </Reveal>
         <Reveal delay={150}>
@@ -128,7 +157,7 @@ export default async function Dashboard() {
           <div className="card p-5 h-full">
             <SectionHeader
               title="Top clients"
-              sub={`Collected in ${now.getFullYear()}`}
+              sub={`Collected in ${monthName}`}
               action={
                 <Link href="/clients" className="text-[12.5px] text-[var(--teal)] inline-flex items-center gap-1">
                   All clients <IconArrowRight size={12} />
