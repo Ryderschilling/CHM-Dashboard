@@ -63,7 +63,21 @@ export default async function Dashboard() {
             value={d.mrr}
             money
             accent
-            sub={d.missingPlanAmounts > 0 ? `${d.missingPlanAmounts} client${d.missingPlanAmounts > 1 ? "s" : ""} missing a plan amount` : "Monthly recurring"}
+            delta={
+              d.mrrDeltaPct === null
+                ? null
+                : {
+                    pct: d.mrrDeltaPct,
+                    title: `Recurring base vs ${money(d.mrrAvg)} average monthly profit over the last ${d.mrrAvgMonths} month${d.mrrAvgMonths > 1 ? "s" : ""} (collected minus labor and expenses)`,
+                  }
+            }
+            sub={
+              d.missingPlanAmounts > 0
+                ? `${d.missingPlanAmounts} client${d.missingPlanAmounts > 1 ? "s" : ""} missing a plan amount`
+                : d.mrrAvg > 0
+                  ? `vs ${money(d.mrrAvg)} avg monthly profit`
+                  : "Monthly recurring"
+            }
             subTone={d.missingPlanAmounts > 0 ? "warn" : "mut"}
           />
           <StatTile label="Collected this month" value={d.collectedMTD} money sub="Money actually in" />

@@ -74,6 +74,31 @@ export async function getDashboard() {
     .reduce((s, e) => s + num(e.amount), 0);
   const profitMTD = collectedMTD - laborMTD - expensesMTD;
 
+  // MRR trend. Compares today's recurring base against the average monthly
+  // PROFIT (collected minus job labor minus expenses) over the last 6 COMPLETE
+  // months. The current partial month is excluded, and months with no activity
+  // at all are skipped so the early ramp-up does not drag the average down.
+  const profitMonths: number[] = [];
+  for (let i = 6; i >= 1; i--) {
+    const key = monthKey(monthStart(-i));
+    const inflow = paid
+      .filter((p) => monthKey(p.paidDate as Date) === key)
+      .reduce((s, p) => s + num(p.amount), 0);
+    const labor = doneJobs
+      .filter((j) => monthKey(j.date) === key)
+      .reduce((s, j) => s + num(j.laborCost), 0);
+    const costs = expenses
+      .filter((e) => monthKey(e.date) === key)
+      .reduce((s, e) => s + num(e.amount), 0);
+    if (inflow === 0 && labor === 0 && costs === 0) continue;
+    profitMonths.push(inflow - labor - costs);
+  }
+  const mrrAvg = profitMonths.length
+    ? profitMonths.reduce((a, b) => a + b, 0) / profitMonths.length
+    : 0;
+  const mrrAvgMonths = profitMonths.length;
+  const mrrDeltaPct = mrrAvg > 0 ? ((mrr - mrrAvg) / mrrAvg) * 100 : null;
+
   // Revenue by month, last 12
   const revenue12: { label: string; a: number }[] = [];
   for (let i = 11; i >= 0; i--) {
@@ -146,6 +171,9 @@ export async function getDashboard() {
 
   return {
     mrr,
+    mrrAvg,
+    mrrAvgMonths,
+    mrrDeltaPct,
     missingPlanAmounts,
     collectedMTD,
     outstanding,

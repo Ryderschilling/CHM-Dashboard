@@ -25,6 +25,11 @@ function mk(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+const PAYMENT_INCLUDE = {
+  client: { select: { id: true, name: true } },
+  expenses: true,
+} as const;
+
 export default async function MoneyPage({
   searchParams,
 }: {
@@ -36,40 +41,88 @@ export default async function MoneyPage({
   const prevMonth = new Date(month.getFullYear(), month.getMonth() - 1, 1);
   const isExpenses = sp.tab === "expenses";
 
-  const [paidInMonth, allDue, expensesInMonth, clients, workers, syncState] = await Promise.all([
-    prisma.payment.findMany({
-      where: { status: "PAID", paidDate: { gte: month, lt: nextMonth } },
-      include: { client: { select: { id: true, name: true } }, expenses: true },
-      orderBy: { paidDate: "desc" },
-    }),
-    prisma.payment.findMany({
-      where: { status: { in: ["DUE", "UPCOMING"] } },
-      include: { client: { select: { id: true, name: true } }, expenses: true },
-      orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
-    }),
-    prisma.expense.findMany({
-      where: { date: { gte: month, lt: nextMonth } },
-      include: {
-        worker: { select: { name: true } },
-        payment: { select: { invoiceNumber: true } },
-        client: { select: { name: true } },
-      },
-      orderBy: { date: "desc" },
-    }),
-    prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.worker.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.appState.findUnique({ where: { key: "lastSquareSync" } }),
-  ]);
+  const now = new Date();
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const isCurrentMonth = month.getTime() === thisMonthStart.getTime();
+
+  // Every tile is scoped to the month on screen.
+  // Deliberate exception: in the CURRENT month view, unpaid invoices whose due
+  // date already passed roll forward, because that money is still owed today.
+  // Undated invoices land in the current month too so they can never disappear.
+  const dueWhere = isCurrentMonth
+    ? { status: "DUE" as const, OR: [{ dueDate: { lt: nextMonth } }, { dueDate: null }] }
+    : { status: "DUE" as const, dueDate: { gte: month, lt: nextMonth } };
+
+  const upcomingWhere = isCurrentMonth
+    ? { status: "UPCOMING" as const, OR: [{ dueDate: { lt: nextMonth } }, { dueDate: null }] }
+    : { status: "UPCOMING" as const, dueDate: { gte: month, lt: nextMonth } };
+
+  const [paidInMonth, due, upcoming, expensesInMonth, clients, workers, syncState, linkables] =
+    await Promise.all([
+      prisma.payment.findMany({
+        where: { status: "PAID", paidDate: { gte: month, lt: nextMonth } },
+        include: PAYMENT_INCLUDE,
+        orderBy: { paidDate: "desc" },
+      }),
+      prisma.payment.findMany({
+        where: dueWhere,
+        include: PAYMENT_INCLUDE,
+        orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
+      }),
+      prisma.payment.findMany({
+        where: upcomingWhere,
+        include: PAYMENT_INCLUDE,
+        orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }],
+      }),
+      prisma.expense.findMany({
+        where: { date: { gte: month, lt: nextMonth } },
+        include: {
+          worker: { select: { name: true } },
+          payment: { select: { invoiceNumber: true } },
+          client: { select: { name: true } },
+        },
+        orderBy: { date: "desc" },
+      }),
+      prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      prisma.worker.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      prisma.appState.findUnique({ where: { key: "lastSquareSync" } }),
+      // Not month-scoped on purpose: the expense form links costs to any recent invoice.
+      prisma.payment.findMany({
+        where: {
+          OR: [
+            { status: { in: ["DUE", "UPCOMING"] } },
+            { paidDate: { gte: new Date(now.getFullYear() - 1, now.getMonth(), 1) } },
+          ],
+        },
+        select: { id: true, invoiceNumber: true, amount: true, client: { select: { name: true } } },
+        orderBy: [{ dueDate: { sort: "desc", nulls: "last" } }],
+      }),
+    ]);
 
   const collected = paidInMonth.reduce((s, p) => s + num(p.amount), 0);
-  const due = allDue.filter((p) => p.status === "DUE");
-  const upcoming = allDue.filter((p) => p.status === "UPCOMING");
   const outstanding = due.reduce((s, p) => s + num(p.amount), 0);
   const upcomingSum = upcoming.reduce((s, p) => s + num(p.amount), 0);
   const overdue = due.filter((p) => isOverdue(p.dueDate)).reduce((s, p) => s + num(p.amount), 0);
   const spent = expensesInMonth.reduce((s, e) => s + num(e.amount), 0);
+  const carriedOver = due.filter((p) => p.dueDate && p.dueDate < month).length;
 
-  const paymentOpts = [...allDue, ...paidInMonth].map((p) => ({
+  const waitingSub =
+    due.length === 0
+      ? isCurrentMonth
+        ? "Nothing sent and unpaid"
+        : `Nothing was due in ${fmtMonth(month)}`
+      : overdue > 0
+        ? `${money(overdue)} overdue, chase it${carriedOver > 0 ? ` (${carriedOver} from earlier)` : ""}`
+        : `${due.length} sent, none overdue`;
+
+  const waitingTone: "good" | "bad" = overdue > 0 ? "bad" : "good";
+
+  const upcomingSub =
+    upcoming.length === 0
+      ? `Nothing scheduled for ${fmtMonth(month)}`
+      : `${upcoming.length} scheduled for ${fmtMonth(month)}, not sent yet`;
+
+  const paymentOpts = linkables.map((p) => ({
     id: p.id,
     label: `${p.invoiceNumber ? `#${p.invoiceNumber} · ` : ""}${p.client?.name ?? "No client"} · ${money(p.amount)}`,
   }));
@@ -164,6 +217,9 @@ export default async function MoneyPage({
             {fmtMonth(month)}
           </span>
           <Link href={`/money?m=${mk(nextMonth)}${isExpenses ? "&tab=expenses" : ""}`} className="btn btn-sm"><IconChevronR size={14} /></Link>
+          {!isCurrentMonth && (
+            <Link href={`/money${isExpenses ? "?tab=expenses" : ""}`} className="btn btn-sm ml-1.5">This month</Link>
+          )}
         </div>
         <div className="flex gap-1.5">
           <Link href={`/money?m=${mk(month)}`} className={`btn btn-sm ${!isExpenses ? "btn-primary" : ""}`}>Payments</Link>
@@ -173,19 +229,8 @@ export default async function MoneyPage({
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <StatTile label={`Collected ${fmtMonth(month)}`} value={collected} money accent />
-        <StatTile
-          label="Waiting on"
-          value={outstanding}
-          money
-          sub={overdue > 0 ? `${money(overdue)} overdue, chase it` : `${due.length} sent, none overdue`}
-          subTone={overdue > 0 ? "bad" : "good"}
-        />
-        <StatTile
-          label="Upcoming"
-          value={upcomingSum}
-          money
-          sub={`${upcoming.length} scheduled, not sent yet`}
-        />
+        <StatTile label="Waiting on" value={outstanding} money sub={waitingSub} subTone={waitingTone} />
+        <StatTile label="Upcoming" value={upcomingSum} money sub={upcomingSub} />
         <StatTile label={`Spent ${fmtMonth(month)}`} value={spent} money />
       </div>
 
@@ -202,7 +247,9 @@ export default async function MoneyPage({
 
           {upcoming.length > 0 && (
             <div className="card overflow-x-auto">
-              <p className="eyebrow px-4 pt-4">Upcoming ({upcoming.length}) · scheduled, not sent yet</p>
+              <p className="eyebrow px-4 pt-4">
+                Upcoming ({upcoming.length}) · scheduled for {fmtMonth(month)}, not sent yet
+              </p>
               <table className="w-full min-w-[760px]">
                 <tbody>{upcoming.map((p) => paymentRow(p, true))}</tbody>
               </table>
