@@ -13,12 +13,17 @@ export type JobDefaults = {
   title?: string;
   jobType?: string | null;
   date?: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  allDay?: boolean;
+  location?: string | null;
   status?: string;
   workerId?: string | null;
   laborCost?: number;
   chargeAmount?: number | null;
   durationMin?: number | null;
   notes?: string | null;
+  gcalEventId?: string | null;
 };
 
 export default function JobForm({
@@ -38,6 +43,7 @@ export default function JobForm({
 }) {
   const isEdit = Boolean(defaults.id);
   const [clientId, setClientId] = useState(fixedClientId ?? defaults.clientId ?? "");
+  const [allDay, setAllDay] = useState(defaults.allDay ?? false);
   const clientProps = properties.filter((p) => p.clientId === clientId);
   const { pending, onSubmit } = useSubmit(isEdit ? updateJob : createJob, onDone);
 
@@ -58,6 +64,29 @@ export default function JobForm({
         <Field label="Date">
           <input name="date" type="date" required defaultValue={defaults.date ?? todayInput()} className="input" />
         </Field>
+
+        <Field label="All day">
+          <label className="flex items-center gap-2 h-[38px] text-[13px] text-[var(--sec)]">
+            <input
+              type="checkbox"
+              name="allDay"
+              checked={allDay}
+              onChange={(e) => setAllDay(e.target.checked)}
+              className="w-4 h-4 accent-[var(--teal)]"
+            />
+            No specific time
+          </label>
+        </Field>
+        {!allDay && (
+          <Field label="Start and end time">
+            <div className="flex items-center gap-2">
+              <input name="startTime" type="time" defaultValue={defaults.startTime ?? ""} className="input" />
+              <span className="text-[var(--mut)] text-[13px]">to</span>
+              <input name="endTime" type="time" defaultValue={defaults.endTime ?? ""} className="input" />
+            </div>
+          </Field>
+        )}
+
         {!fixedClientId && (
           <Field label="Client">
             <select name="clientId" value={clientId} onChange={(e) => setClientId(e.target.value)} className="select">
@@ -74,6 +103,9 @@ export default function JobForm({
             </select>
           </Field>
         )}
+        <Field label="Address or place">
+          <input name="location" defaultValue={defaults.location ?? ""} className="input" placeholder="94 Roundwood Way" />
+        </Field>
         <Field label="Who is doing it?">
           <select name="workerId" defaultValue={defaults.workerId ?? ""} className="select">
             <option value="">Me (Ryder)</option>
@@ -93,14 +125,17 @@ export default function JobForm({
         <Field label="Charge ($, what the client pays)">
           <input name="chargeAmount" type="number" step="0.01" min="0" defaultValue={defaults.chargeAmount ?? ""} className="input" placeholder="Blank if covered by plan" />
         </Field>
-        <Field label="Duration (minutes)">
-          <input name="durationMin" type="number" min="0" defaultValue={defaults.durationMin ?? ""} className="input" placeholder="45" />
-        </Field>
       </FormGrid>
 
       <Field label="Notes">
         <textarea name="notes" rows={2} defaultValue={defaults.notes ?? ""} className="textarea" placeholder="Gate code changed, AC filter due..." />
       </Field>
+
+      <p className="text-[11.5px] text-[var(--mut)]">
+        {defaults.gcalEventId
+          ? "Saving updates this event on your Google Calendar."
+          : "Saving also puts this on your Google Calendar, so it shows on your phone."}
+      </p>
 
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" className="btn" onClick={onDone}>Cancel</button>

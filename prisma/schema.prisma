@@ -163,8 +163,29 @@ model Job {
   chargeAmount Decimal?  @db.Decimal(10, 2)
   durationMin  Int?
   notes        String?
+  /// End of the time block. Null means use durationMin, or treat as a point in time.
+  endDate      DateTime?
+  allDay       Boolean   @default(false)
+  location     String?
+
+  // --- Google Calendar link ---
+  /// The Google event id. For an occurrence of a recurring series this is the
+  /// instance id (e.g. "abc123_20260805T140000Z"), so each visit is its own row.
+  gcalEventId  String?   @unique
+  /// recurringEventId when this job is one occurrence of a series.
+  gcalSeriesId String?
+  /// Google's `updated` timestamp at the last successful sync. Used to decide
+  /// whether Google or CHM has the fresher version of the scheduling fields.
+  gcalUpdated  DateTime?
+  syncedAt     DateTime?
+
+  tasks        Task[]
+
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  @@index([gcalSeriesId])
+  @@index([date])
 }
 
 model Task {
@@ -175,9 +196,15 @@ model Task {
   priority  TaskPriority @default(NORMAL)
   clientId  String?
   client    Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  /// Optional link to the job this is a step of. Job checklists render from this
+  /// and get written into the Google event description so they show on the phone.
+  jobId     String?
+  job       Job?         @relation(fields: [jobId], references: [id], onDelete: Cascade)
   notes     String?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
+
+  @@index([jobId])
 }
 
 model Expense {
