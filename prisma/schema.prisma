@@ -56,6 +56,41 @@ enum TaskPriority {
   HIGH
 }
 
+/// Where a client's smart water shutoff valve is in its lifecycle.
+enum ShutoffStatus {
+  QUOTED
+  SCHEDULED
+  INSTALLED
+  REMOVED
+}
+
+/// What the device (or the plumber) told us.
+enum AlertKind {
+  LEAK
+  HIGH_FLOW
+  SHUTOFF_TRIGGERED
+  LOW_TEMP
+  FREEZE_RISK
+  OFFLINE
+  BATTERY
+  TEST
+  OTHER
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+/// Lifecycle of one year's Coverage Record PDF for one client.
+enum CoverageStatus {
+  ENROLLED
+  DUE
+  DRAFTED
+  SENT
+}
+
 enum ExpenseCategory {
   LABOR
   SUPPLIES
@@ -67,24 +102,24 @@ enum ExpenseCategory {
 }
 
 model Client {
-  id          String         @id @default(cuid())
-  name        String
-  status      ClientStatus   @default(ACTIVE)
-  email       String?
-  phone       String?
-  altContact  String?
-  community   String?
-  planName    String?
-  planAmount  Decimal?       @db.Decimal(10, 2)
-  cadence     BillingCadence @default(MONTHLY)
-  lockedRate  Boolean        @default(false)
-  lockedUntil DateTime?
-  startDate   DateTime?
-  source      String?
+  id               String         @id @default(cuid())
+  name             String
+  status           ClientStatus   @default(ACTIVE)
+  email            String?
+  phone            String?
+  altContact       String?
+  community        String?
+  planName         String?
+  planAmount       Decimal?       @db.Decimal(10, 2)
+  cadence          BillingCadence @default(MONTHLY)
+  lockedRate       Boolean        @default(false)
+  lockedUntil      DateTime?
+  startDate        DateTime?
+  source           String?
   squareCustomerId String?
-  notes       String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  notes            String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   properties  Property[]
   payments    Payment[]
@@ -93,12 +128,15 @@ model Client {
   logs        Note[]
   squareLinks SquareLink[]
   expenses    Expense[]
+
+  shutoffDevices  ShutoffDevice[]
+  coverageRecords CoverageRecord[]
 }
 
 model Property {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   clientId     String
-  client       Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   label        String?
   address      String
   gateCode     String?
@@ -112,7 +150,8 @@ model Property {
   notes        String?
   createdAt    DateTime @default(now())
 
-  jobs Job[]
+  jobs           Job[]
+  shutoffDevices ShutoffDevice[]
 }
 
 model Payment {
@@ -134,14 +173,14 @@ model Payment {
 }
 
 model Worker {
-  id         String    @id @default(cuid())
+  id         String   @id @default(cuid())
   name       String
   phone      String?
   email      String?
-  defaultPay Decimal?  @db.Decimal(10, 2)
+  defaultPay Decimal? @db.Decimal(10, 2)
   payNote    String?
-  active     Boolean   @default(true)
-  createdAt  DateTime  @default(now())
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
   jobs     Job[]
   expenses Expense[]
@@ -184,10 +223,10 @@ model Job {
   gcalUpdated  DateTime?
   syncedAt     DateTime?
 
-  tasks        Task[]
+  tasks Task[]
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([gcalSeriesId])
   @@index([date])
@@ -238,6 +277,106 @@ model Note {
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   body      String
   createdAt DateTime @default(now())
+}
+
+/// A smart automatic water shutoff valve on a client's main line.
+/// Sold at $1,295 installed plus $35/mo to monitor. Monitoring is bundled
+/// into the Coastal Elite plan. Read the public site's src/data/protection.ts
+/// before writing any client-facing copy about this: we never claim it lowers
+/// anyone's premium, we say the client's own carrier may publish a credit.
+model ShutoffDevice {
+  id         String    @id @default(cuid())
+  clientId   String
+  client     Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  status       ShutoffStatus @default(QUOTED)
+  /// Phyn Plus, Flo by Moen, FloLogic, Water Hero, Leak Defense, Moen Smart Water.
+  brand        String?
+  model        String?
+  serialNumber String?
+
+  installDate  DateTime?
+  /// Which plumber put it in, so warranty calls go to the right person.
+  installedBy  String?
+  /// What the client paid for the install.
+  installPrice Decimal?  @db.Decimal(10, 2)
+  /// What the hardware plus plumber cost us. installPrice minus this is the margin.
+  installCost  Decimal?  @db.Decimal(10, 2)
+
+  /// True when we are holding the alerts and responding.
+  monitored     Boolean  @default(false)
+  monitoringFee Decimal? @db.Decimal(10, 2)
+
+  /// Last time we confirmed the device was online and healthy.
+  lastCheckedAt DateTime?
+  warrantyEnd   DateTime?
+  notes         String?
+
+  alerts    ShutoffAlert[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+}
+
+/// One thing the shutoff device reported, and what we did about it.
+/// Every row here is also evidence: it is dated, it names the property, and
+/// it records the response. Keep resolvedAt honest.
+model ShutoffAlert {
+  id       String        @id @default(cuid())
+  deviceId String
+  device   ShutoffDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  occurredAt DateTime
+  kind       AlertKind     @default(OTHER)
+  severity   AlertSeverity @default(WARNING)
+  /// One line, what the alert said.
+  summary    String
+  /// What we did. Drove over, closed the valve, called the plumber.
+  action     String?
+  /// Null means still open.
+  resolvedAt DateTime?
+  notes      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([deviceId])
+  @@index([occurredAt])
+  @@index([resolvedAt])
+}
+
+/// One year's Coverage Record for one client: the dated PDF of every visit,
+/// $195/year, included on Coastal Elite. A row existing means the client is
+/// enrolled for that period. dueDate drives the "who do I owe a PDF" list.
+model CoverageRecord {
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  periodStart DateTime
+  periodEnd   DateTime
+  /// When Ryder wants it in the client's hands. Usually periodEnd plus a couple weeks.
+  dueDate     DateTime
+  status      CoverageStatus @default(ENROLLED)
+  sentDate    DateTime?
+  /// What they pay for it. Null on Coastal Elite, where it is included.
+  fee         Decimal?       @db.Decimal(10, 2)
+  /// Where the finished PDF lives (Drive link, local path, whatever).
+  fileUrl     String?
+  /// Snapshot of what went into the document, filled when it is built.
+  visitCount  Int?
+  photoCount  Int?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([dueDate])
+  @@index([status])
 }
 
 /// Maps Square customer IDs to clients. One client can own several

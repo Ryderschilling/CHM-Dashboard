@@ -20,6 +20,18 @@ import { deleteClient } from "@/actions/clients";
 import { deletePayment, markPaymentPaid, deleteExpense } from "@/actions/money";
 import { deleteJob, completeJob } from "@/actions/jobs";
 import { deleteWorker } from "@/actions/workers";
+import ShutoffForm, { type ShutoffDefaults } from "./forms/ShutoffForm";
+import AlertForm, { type AlertDefaults } from "./forms/AlertForm";
+import CoverageForm, { type CoverageDefaults } from "./forms/CoverageForm";
+import {
+  deleteShutoffDevice,
+  deleteShutoffAlert,
+  deleteCoverageRecord,
+  markDeviceChecked,
+  resolveShutoffAlert,
+  markCoverageSent,
+  renewCoverageRecord,
+} from "@/actions/protection";
 import { Field, FormGrid } from "./ui";
 
 type Opt = { id: string; name: string };
@@ -346,6 +358,181 @@ export function WorkerActions({ worker }: { worker: WorkerDefaults & { id: strin
       <ConfirmDelete action={deleteWorker} id={worker.id} />
       <Modal title={`Edit ${worker.name}`} open={open} onClose={() => setOpen(false)}>
         <WorkerForm defaults={worker} onDone={() => setOpen(false)} />
+      </Modal>
+    </span>
+  );
+}
+
+/* ---------------- Protection: shutoff devices ---------------- */
+
+export function AddShutoffButton({
+  clients,
+  properties,
+  autoOpen = false,
+  label = "Add device",
+  primary = true,
+}: {
+  clients: Opt[];
+  properties: PropOpt[];
+  autoOpen?: boolean;
+  label?: string;
+  primary?: boolean;
+}) {
+  const [open, setOpen] = useState(autoOpen);
+  return (
+    <>
+      <button className={`btn ${primary ? "btn-primary" : ""}`} onClick={() => setOpen(true)}>
+        <IconPlus size={14} /> {label}
+      </button>
+      <Modal title="Add water shutoff device" open={open} onClose={() => setOpen(false)} wide>
+        <ShutoffForm clients={clients} properties={properties} onDone={() => setOpen(false)} />
+      </Modal>
+    </>
+  );
+}
+
+export function ShutoffActions({
+  device,
+  clients,
+  properties,
+  devices,
+}: {
+  device: ShutoffDefaults & { id: string };
+  clients: Opt[];
+  properties: PropOpt[];
+  devices: { id: string; label: string }[];
+}) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [alertOpen, setAlertOpen] = useState(false);
+  const { pending, fire } = useFire(markDeviceChecked);
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button className="btn btn-sm" disabled={pending} onClick={() => fire({ id: device.id })} title="Stamp today as the last health check">
+        {pending ? "..." : "Checked"}
+      </button>
+      <button className="btn btn-sm" onClick={() => setAlertOpen(true)}>
+        Alert
+      </button>
+      <button className="btn btn-sm" onClick={() => setEditOpen(true)} title="Edit">
+        <IconEdit size={13} />
+      </button>
+      <ConfirmDelete action={deleteShutoffDevice} id={device.id} />
+      <Modal title="Edit device" open={editOpen} onClose={() => setEditOpen(false)} wide>
+        <ShutoffForm defaults={device} clients={clients} properties={properties} onDone={() => setEditOpen(false)} />
+      </Modal>
+      <Modal title="Log an alert" open={alertOpen} onClose={() => setAlertOpen(false)} wide>
+        <AlertForm defaults={{ deviceId: device.id }} devices={devices} onDone={() => setAlertOpen(false)} />
+      </Modal>
+    </span>
+  );
+}
+
+/* ---------------- Protection: alerts ---------------- */
+
+export function AddAlertButton({
+  devices,
+  primary = false,
+}: {
+  devices: { id: string; label: string }[];
+  primary?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className={`btn ${primary ? "btn-primary" : ""}`} onClick={() => setOpen(true)}>
+        <IconPlus size={14} /> Log alert
+      </button>
+      <Modal title="Log an alert" open={open} onClose={() => setOpen(false)} wide>
+        <AlertForm devices={devices} onDone={() => setOpen(false)} />
+      </Modal>
+    </>
+  );
+}
+
+export function AlertActions({
+  alert,
+  devices,
+}: {
+  alert: AlertDefaults & { id: string; resolved: boolean };
+  devices: { id: string; label: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const { pending, fire } = useFire(resolveShutoffAlert);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {!alert.resolved && (
+        <button className="btn btn-sm" disabled={pending} onClick={() => fire({ id: alert.id })}>
+          {pending ? "..." : "Resolve"}
+        </button>
+      )}
+      <button className="btn btn-sm" onClick={() => setOpen(true)} title="Edit">
+        <IconEdit size={13} />
+      </button>
+      <ConfirmDelete action={deleteShutoffAlert} id={alert.id} />
+      <Modal title="Edit alert" open={open} onClose={() => setOpen(false)} wide>
+        <AlertForm defaults={alert} devices={devices} onDone={() => setOpen(false)} />
+      </Modal>
+    </span>
+  );
+}
+
+/* ---------------- Protection: coverage records ---------------- */
+
+export function AddCoverageButton({
+  clients,
+  autoOpen = false,
+  label = "Enroll client",
+  primary = true,
+}: {
+  clients: Opt[];
+  autoOpen?: boolean;
+  label?: string;
+  primary?: boolean;
+}) {
+  const [open, setOpen] = useState(autoOpen);
+  return (
+    <>
+      <button className={`btn ${primary ? "btn-primary" : ""}`} onClick={() => setOpen(true)}>
+        <IconPlus size={14} /> {label}
+      </button>
+      <Modal title="Annual Coverage Record" open={open} onClose={() => setOpen(false)} wide>
+        <CoverageForm clients={clients} onDone={() => setOpen(false)} />
+      </Modal>
+    </>
+  );
+}
+
+export function CoverageActions({
+  record,
+  clients,
+}: {
+  record: CoverageDefaults & { id: string; status: string };
+  clients: Opt[];
+}) {
+  const [open, setOpen] = useState(false);
+  const sent = useFire(markCoverageSent);
+  const renew = useFire(renewCoverageRecord);
+  const isSent = record.status === "SENT";
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {!isSent && (
+        <button className="btn btn-sm" disabled={sent.pending} onClick={() => sent.fire({ id: record.id })}>
+          {sent.pending ? "..." : "Mark sent"}
+        </button>
+      )}
+      {isSent && (
+        <button className="btn btn-sm" disabled={renew.pending} onClick={() => renew.fire({ id: record.id })} title="Start the next 12-month period">
+          {renew.pending ? "..." : "Renew"}
+        </button>
+      )}
+      <button className="btn btn-sm" onClick={() => setOpen(true)} title="Edit">
+        <IconEdit size={13} />
+      </button>
+      <ConfirmDelete action={deleteCoverageRecord} id={record.id} />
+      <Modal title="Edit coverage record" open={open} onClose={() => setOpen(false)} wide>
+        <CoverageForm defaults={record} clients={clients} onDone={() => setOpen(false)} />
       </Modal>
     </span>
   );

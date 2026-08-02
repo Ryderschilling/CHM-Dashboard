@@ -38,6 +38,8 @@ export default async function ClientDetail({
         jobs: { include: { worker: true }, orderBy: { date: "desc" }, take: 30 },
         tasks: { orderBy: [{ done: "asc" }, { createdAt: "desc" }], take: 20 },
         logs: { orderBy: { createdAt: "desc" }, take: 25 },
+        shutoffDevices: { include: { alerts: { orderBy: { occurredAt: "desc" }, take: 3 } } },
+        coverageRecords: { orderBy: { dueDate: "desc" } },
       },
     }),
     prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -217,6 +219,56 @@ export default async function ClientDetail({
               </div>
             ) : (
               <Empty text="No property on file yet." />
+            )}
+          </div>
+
+          {/* Protection. Full management lives on /protection. */}
+          <div className="card p-5">
+            <SectionHeader
+              title="Protection"
+              sub="Water shutoff and the annual Coverage Record"
+              action={
+                <Link href="/protection" className="btn btn-sm">
+                  Manage
+                </Link>
+              }
+            />
+            {client.shutoffDevices.length === 0 && client.coverageRecords.length === 0 ? (
+              <Empty text="Not on either protection service yet. Both are an easy add at renewal." />
+            ) : (
+              <div className="space-y-2.5">
+                {client.shutoffDevices.map((d) => (
+                  <div key={d.id} className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-2)] px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] font-medium">
+                        Water shutoff{d.brand ? ` · ${d.brand}` : ""}
+                      </p>
+                      <p className="text-[12px] text-[var(--mut)]">
+                        {d.installDate ? `Installed ${fmtDate(d.installDate)}` : "Not installed yet"}
+                        {d.monitored ? " · monitored by you" : " · not monitored"}
+                        {d.alerts.length ? ` · last alert ${fmtDate(d.alerts[0].occurredAt)}` : ""}
+                      </p>
+                    </div>
+                    <StatusBadge status={d.status} />
+                  </div>
+                ))}
+                {client.coverageRecords.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-2)] px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] font-medium">
+                        Coverage Record {r.periodStart.getFullYear()}
+                      </p>
+                      <p className="text-[12px] text-[var(--mut)]">
+                        {r.status === "SENT" && r.sentDate
+                          ? `Sent ${fmtDate(r.sentDate)}`
+                          : `Send by ${fmtDate(r.dueDate)}`}
+                        {r.fee ? ` · ${money(r.fee)}/yr` : " · included in plan"}
+                      </p>
+                    </div>
+                    <StatusBadge status={r.status} />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 

@@ -30,6 +30,21 @@ It runs his real business with live data. Treat every change as production.
 6. **New files in `public/` must be added to the middleware matcher** in
    `src/middleware.ts`, or the auth gate 307s them to /login.
 7. **No em-dashes anywhere**: UI copy, comments, docs. Ryder's rule.
+7a. **The insurance language rule. Never cross this line.** CHM sells two
+   claim-protection services (Water Shutoff Protection, Annual Coverage
+   Record) and neither one lowers anybody's insurance premium. Verified
+   August 2026: no US carrier gives a discount for a home watch service.
+   In anything that could reach a client, never say or imply that CHM
+   lowers, reduces, or discounts a premium; never say "second insurance";
+   never say a carrier requires, endorses, or approves CHM; never call a
+   visit an "inspection" (home inspection is a licensed profession under
+   Fla. Stat. 468.8311 and practicing without the license is a first-degree
+   misdemeanor under 468.8319, so use visit, walkthrough, check, condition
+   report); never give advice about anyone's coverage. What IS true: the
+   shutoff DEVICE carries a published premium credit at some carriers
+   (PURE among them), which is the client's carrier's doing and attaches to
+   the device, not to us. The full rule with citations lives in the public
+   site repo at `src/data/protection.ts`. Read it before writing copy.
 8. Convert Prisma `Decimal` with `num()` (src/lib/format.ts) before passing
    values to client components.
 9. All displayed dates/times render in America/Chicago via `fmtDate`/`fmtTime`.

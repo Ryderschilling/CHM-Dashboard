@@ -65,6 +65,18 @@ export function StatusBadge({ status }: { status: string }) {
     HIGH: { cls: "badge-bad", label: "High" },
     NORMAL: { cls: "badge-mut", label: "Normal" },
     LOW: { cls: "badge-mut", label: "Low" },
+    // Water shutoff devices
+    QUOTED: { cls: "badge-mut", label: "Quoted" },
+    INSTALLED: { cls: "badge-good", label: "Installed" },
+    REMOVED: { cls: "badge-mut", label: "Removed" },
+    // Alert severity
+    INFO: { cls: "badge-mut", label: "Info" },
+    WARNING: { cls: "badge-warn", label: "Warning" },
+    CRITICAL: { cls: "badge-bad", label: "Critical" },
+    // Coverage records
+    ENROLLED: { cls: "badge-teal", label: "Enrolled" },
+    DRAFTED: { cls: "badge-warn", label: "Drafted" },
+    SENT: { cls: "badge-good", label: "Sent" },
   };
   const m = map[status] ?? { cls: "badge-mut", label: status };
   return <span className={`badge ${m.cls}`}>{m.label}</span>;
@@ -108,3 +120,15 @@ export const JOB_TYPES = [
   "Rock install",
   "Other",
 ];
+
+export const ALERT_KIND_LABEL: Record<string, string> = {
+  LEAK: "Leak detected",
+  HIGH_FLOW: "High flow",
+  SHUTOFF_TRIGGERED: "Valve closed itself",
+  LOW_TEMP: "Low temperature",
+  FREEZE_RISK: "Freeze risk",
+  OFFLINE: "Device offline",
+  BATTERY: "Battery",
+  TEST: "Test",
+  OTHER: "Other",
+};

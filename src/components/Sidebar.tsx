@@ -10,6 +10,7 @@ import {
   IconWrench,
   IconTeam,
   IconCheck,
+  IconShield,
   IconLogout,
 } from "./icons";
 
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/clients", label: "Clients", icon: IconUsers },
   { href: "/money", label: "Money", icon: IconDollar },
   { href: "/jobs", label: "Jobs", icon: IconWrench },
+  { href: "/protection", label: "Protection", icon: IconShield },
   { href: "/team", label: "Team", icon: IconTeam },
   { href: "/tasks", label: "Tasks", icon: IconCheck },
 ];

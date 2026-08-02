@@ -149,3 +149,24 @@ export const IconKey = (p: IconProps) => (
     <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
   </svg>
 );
+
+export const IconShield = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 3l7 3v5.5c0 4.3-2.9 8.3-7 9.5-4.1-1.2-7-5.2-7-9.5V6l7-3z" />
+    <path d="M9.2 12.1l2 2 3.6-3.9" />
+  </svg>
+);
+
+export const IconDroplet = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 3.2s5.5 5.4 5.5 9.2a5.5 5.5 0 0 1-11 0c0-3.8 5.5-9.2 5.5-9.2z" />
+  </svg>
+);
+
+export const IconDoc = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+    <path d="M14 3v5h5" />
+    <path d="M9 13h6M9 17h4" />
+  </svg>
+);
