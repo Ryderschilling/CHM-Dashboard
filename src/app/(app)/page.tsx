@@ -58,7 +58,8 @@ export default async function Dashboard({
             </h1>
           </div>
           <div className="flex gap-2">
-            <Link href="/money?new=1" className="btn btn-primary">Log payment</Link>
+            <Link href="/visits?new=1" className="btn btn-primary">Report a visit</Link>
+            <Link href="/money?new=1" className="btn">Log payment</Link>
             <Link href="/jobs?new=1" className="btn">Add job</Link>
             <Link href="/tasks?new=1" className="btn">Add task</Link>
           </div>

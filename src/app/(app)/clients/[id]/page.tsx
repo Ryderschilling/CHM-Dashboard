@@ -33,12 +33,17 @@ export default async function ClientDetail({
     prisma.client.findUnique({
       where: { id },
       include: {
-        properties: { orderBy: { createdAt: "asc" } },
+        properties: { orderBy: { createdAt: "asc" }, include: { checkAreas: { orderBy: { sortOrder: "asc" } } } },
         payments: { include: { expenses: true }, orderBy: [{ status: "asc" }, { createdAt: "desc" }], take: 40 },
         jobs: { include: { worker: true }, orderBy: { date: "desc" }, take: 30 },
         tasks: { orderBy: [{ done: "asc" }, { createdAt: "desc" }], take: 20 },
         logs: { orderBy: { createdAt: "desc" }, take: 25 },
         shutoffDevices: { include: { alerts: { orderBy: { occurredAt: "desc" }, take: 3 } } },
+        visitReports: {
+          include: { findings: { select: { state: true, label: true } }, photos: { select: { id: true } } },
+          orderBy: { visitDate: "desc" },
+          take: 12,
+        },
         coverageRecords: { orderBy: { dueDate: "desc" } },
       },
     }),
@@ -200,6 +205,7 @@ export default async function ClientDetail({
                   <PropertyCard
                     key={p.id}
                     clientId={client.id}
+                    checkAreas={p.checkAreas}
                     property={{
                       id: p.id,
                       label: p.label,
@@ -219,6 +225,55 @@ export default async function ClientDetail({
               </div>
             ) : (
               <Empty text="No property on file yet." />
+            )}
+          </div>
+
+          {/* Visit reports. The evidence trail that becomes the annual record. */}
+          <div className="card p-5">
+            <SectionHeader
+              title="Visit reports"
+              sub="Dated walkthroughs with area-level findings"
+              action={
+                <Link href={`/visits?client=${client.id}`} className="btn btn-sm">
+                  All visits
+                </Link>
+              }
+            />
+            {client.visitReports.length === 0 ? (
+              <Empty text="No visit reports yet. Report a walkthrough and it lands here, on the jobs list, and in this year's record." />
+            ) : (
+              <div className="space-y-1">
+                {client.visitReports.map((v) => {
+                  const issues = v.findings.filter((f) => f.state === "ISSUE");
+                  const checked = v.findings.filter((f) => f.state !== "NA").length;
+                  return (
+                    <Link
+                      key={v.id}
+                      href={`/visits/${v.id}`}
+                      className="flex items-start justify-between gap-3 py-2 border-b border-[var(--border)] last:border-0 group"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[13.5px] font-medium group-hover:text-[var(--teal)] transition-colors">
+                          {fmtDate(v.visitDate)}
+                          {v.status === "DRAFT" && (
+                            <span className="ml-2 text-[11.5px] text-[var(--warn)]">draft</span>
+                          )}
+                        </p>
+                        <p className="text-[12px] text-[var(--mut)]">
+                          {checked} areas checked
+                          {v.photos.length ? ` · ${v.photos.length} photos` : ""}
+                          {v.minutesOnSite ? ` · ${v.minutesOnSite} min` : ""}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 text-[12px] ${issues.length ? "text-[var(--warn)]" : "text-[var(--good)]"}`}
+                      >
+                        {issues.length ? `${issues.length} flagged` : "All clear"}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
             )}
           </div>
 

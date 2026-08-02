@@ -6,6 +6,7 @@ import PropertyForm, { type PropertyDefaults } from "./forms/PropertyForm";
 import ConfirmDelete from "./forms/ConfirmDelete";
 import { deleteProperty } from "@/actions/clients";
 import { IconEdit, IconEye, IconEyeOff, IconHome, IconPlus } from "./icons";
+import CheckAreasEditor, { type Area } from "./CheckAreasEditor";
 
 function Secret({ value }: { value: string | null | undefined }) {
   const [show, setShow] = useState(false);
@@ -35,9 +36,12 @@ function Row({ k, children }: { k: string; children: React.ReactNode }) {
 export function PropertyCard({
   property,
   clientId,
+  checkAreas = [],
 }: {
   property: PropertyDefaults & { id: string; address: string };
   clientId: string;
+  /** This property's walkthrough checklist. Drives the visit report form. */
+  checkAreas?: Area[];
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -53,6 +57,7 @@ export function PropertyCard({
           </div>
         </div>
         <span className="inline-flex gap-1.5 shrink-0">
+          <CheckAreasEditor propertyId={property.id} address={property.address} areas={checkAreas} />
           <button className="btn btn-sm" onClick={() => setOpen(true)}>
             <IconEdit size={13} />
           </button>

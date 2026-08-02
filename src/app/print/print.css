@@ -1,0 +1,300 @@
+/*
+ * Branded print styles. Palette and type match coastalhomemngt30a.com exactly:
+ * paper #ffffff, ink #0a0a0a (never pure black on white), muted #56565c,
+ * teal #0d7f79 used sparingly. Archivo for display, Instrument Sans for body,
+ * both already loaded by the root layout.
+ *
+ * Everything here is scoped under .paper so it cannot leak into the dark
+ * dashboard UI. This file is intentionally NOT inside globals.css @layer,
+ * because it is a separate document surface, not a dashboard component.
+ */
+
+.paper {
+  --p-ink: #0a0a0a;
+  --p-ink-2: #16161a;
+  --p-muted: #56565c;
+  --p-soft: #96969e;
+  --p-hair: rgba(10, 10, 10, 0.1);
+  --p-hair-2: rgba(10, 10, 10, 0.2);
+  --p-teal: #0d7f79;
+  --p-alt: #f4f4f1;
+
+  background: #ffffff;
+  color: var(--p-ink);
+  font-family: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.6;
+  letter-spacing: 0.005em;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  color-scheme: light;
+}
+
+.paper * { box-sizing: border-box; }
+
+.sheet {
+  max-width: 7.9in;
+  margin: 0 auto;
+  padding: 0.7in 0.75in 0.9in;
+  background: #fff;
+}
+
+/* ── Brand header ─────────────────────────────────────────────── */
+
+.brandbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1.5px solid var(--p-ink);
+}
+
+.brand { display: flex; align-items: center; gap: 11px; }
+
+.brand-mark {
+  width: 34px; height: 34px;
+  border-radius: 5px;
+  background: var(--p-ink);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-archivo), sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.brand-name {
+  font-family: var(--font-archivo), sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.brand-sub {
+  font-size: 10px;
+  color: var(--p-muted);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+.brand-contact {
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--p-muted);
+  line-height: 1.7;
+}
+
+/* ── Type ─────────────────────────────────────────────────────── */
+
+.doc-title {
+  font-family: var(--font-archivo), sans-serif;
+  font-weight: 600;
+  font-size: 30px;
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+  margin: 30px 0 8px;
+}
+
+.doc-title--sm { font-size: 24px; }
+
+.eyebrow-p {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: var(--p-teal);
+  margin: 0 0 10px;
+}
+
+.lede {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--p-muted);
+  max-width: 62ch;
+  margin: 0 0 6px;
+}
+
+.h2 {
+  font-family: var(--font-archivo), sans-serif;
+  font-weight: 600;
+  font-size: 15.5px;
+  letter-spacing: -0.012em;
+  margin: 30px 0 12px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--p-hair);
+}
+
+.h3 {
+  font-family: var(--font-archivo), sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--p-muted);
+  margin: 18px 0 7px;
+}
+
+.rule { height: 1px; background: var(--p-teal); width: 54px; margin: 18px 0 22px; }
+
+/* ── Meta grid ────────────────────────────────────────────────── */
+
+.meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border-top: 1px solid var(--p-hair);
+  border-bottom: 1px solid var(--p-hair);
+  margin: 22px 0 4px;
+}
+
+.meta > div { padding: 13px 14px 13px 0; }
+.meta dt {
+  font-size: 9.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--p-soft);
+  margin: 0 0 5px;
+}
+.meta dd { margin: 0; font-size: 13px; font-weight: 500; }
+
+/* ── Findings ─────────────────────────────────────────────────── */
+
+.findings { width: 100%; border-collapse: collapse; }
+.findings tr { border-bottom: 1px solid var(--p-hair); }
+.findings tr:last-child { border-bottom: 0; }
+.findings td { padding: 7px 0; vertical-align: top; font-size: 12px; }
+.findings td.state {
+  width: 118px;
+  text-align: right;
+  font-weight: 600;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.state-ok { color: #0f7a4a; }
+.state-issue { color: #b4272c; }
+.state-na { color: var(--p-soft); }
+.finding-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--p-muted);
+}
+
+/* ── Visit blocks in the annual record ────────────────────────── */
+
+.visit {
+  border: 1px solid var(--p-hair);
+  border-radius: 7px;
+  padding: 15px 17px;
+  margin-bottom: 11px;
+  break-inside: avoid;
+}
+.visit-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.visit-date {
+  font-family: var(--font-archivo), sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.visit-meta { font-size: 10.5px; color: var(--p-soft); }
+.visit-line { font-size: 11.5px; color: var(--p-muted); margin: 4px 0 0; }
+.visit-flag { color: #b4272c; }
+.visit-clear { color: #0f7a4a; }
+
+/* ── Photos ───────────────────────────────────────────────────── */
+
+.shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+.shot { break-inside: avoid; }
+.shot img {
+  width: 100%;
+  height: 118px;
+  object-fit: cover;
+  border-radius: 5px;
+  border: 1px solid var(--p-hair);
+}
+.shot figcaption { font-size: 10px; color: var(--p-muted); margin-top: 4px; line-height: 1.45; }
+
+/* ── Callouts and footer ──────────────────────────────────────── */
+
+.note {
+  background: var(--p-alt);
+  border-radius: 7px;
+  padding: 15px 17px;
+  font-size: 12px;
+  line-height: 1.68;
+  break-inside: avoid;
+}
+
+.disclaimer {
+  margin-top: 34px;
+  padding-top: 14px;
+  border-top: 1px solid var(--p-hair);
+  font-size: 9.5px;
+  line-height: 1.65;
+  color: var(--p-soft);
+}
+
+.signature {
+  margin-top: 30px;
+  padding-top: 16px;
+  border-top: 1.5px solid var(--p-ink);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  break-inside: avoid;
+}
+.sig-name { font-family: var(--font-archivo), sans-serif; font-weight: 600; font-size: 13px; }
+.sig-role { font-size: 10.5px; color: var(--p-muted); margin-top: 2px; }
+
+/* ── Screen-only toolbar ──────────────────────────────────────── */
+
+.printbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #0a0a0b;
+  color: #f4f4f1;
+  padding: 11px 18px;
+  font-size: 12.5px;
+}
+.printbar a, .printbar button {
+  font: inherit;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: transparent;
+  color: inherit;
+  border-radius: 8px;
+  padding: 6px 13px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.printbar .go { background: #2fd4c4; color: #0a0a0b; border-color: #2fd4c4; font-weight: 600; }
+.printbar-hint { color: #a3a3ad; font-size: 11.5px; }
+
+/* ── Print ────────────────────────────────────────────────────── */
+
+@page { size: letter; margin: 0.55in; }
+
+@media print {
+  .printbar { display: none !important; }
+  .sheet { max-width: none; padding: 0; }
+  .paper { font-size: 11pt; }
+  .page-break { break-before: page; }
+  a { color: inherit; text-decoration: none; }
+  .brandbar { break-after: avoid; }
+  .h2 { break-after: avoid; }
+}

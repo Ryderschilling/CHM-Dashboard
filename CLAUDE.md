@@ -50,6 +50,44 @@ It runs his real business with live data. Treat every change as production.
 9. All displayed dates/times render in America/Chicago via `fmtDate`/`fmtTime`.
    Keep it that way; the server may run in UTC (Vercel).
 
+## Visit reports and the printed record
+
+- **Report a visit** is the main daily action. Buttons on the Dashboard, Jobs,
+  and /visits. The form loads that PROPERTY's own checklist
+  (`PropertyCheckArea`), every line pre-set to **Dry / good**. Ryder only taps
+  what is not. Notes only appear on a line marked Needs attention.
+- Each property's checklist is edited from the **Checklist** button on its
+  PropertyCard. Seed it from `src/lib/checkAreas.ts`, then trim it to the house
+  (no pool line on a house with no pool).
+- `VisitFinding.label` is a **snapshot** taken at report time. Renaming an area
+  later must never rewrite what a past record says. Do not "fix" this.
+- **DRAFT reports are excluded from the annual record on purpose.** A
+  half-finished write-up must not reach a document a client could hand an
+  adjuster.
+- **Money and time flow into the EXISTING model, never a parallel one.** Saving
+  a report calls `syncJobFromReport` (writes laborHours, laborCost,
+  chargeAmount, status DONE onto the Job, creating one if the visit was not on
+  the calendar) and `syncExpenseFromReport` (materials become a SUPPLIES
+  Expense, tagged `[visit] <reportId>` in the description so a re-save replaces
+  rather than stacks). Do not add a second accounting path.
+- **Photos are `Bytes` in Postgres**, served by `/api/photo/[id]`. One source
+  of truth across localhost and Vercel, no storage account to set up. The form
+  downscales to 1400px / JPEG 0.7 **in the browser** (`src/lib/photo.ts`), so a
+  photo is roughly 120-180KB. /visits shows total storage used. If that
+  approaches the Neon plan limit, move `data` to Vercel Blob and keep the row.
+- **PDFs are print views, not a PDF library.** `/print/visit/[id]` and
+  `/print/coverage/[id]` render branded HTML with `src/app/print/print.css`,
+  and Ryder hits Cmd+P then Save as PDF. This is deliberate: it honors the
+  no-extra-libraries rule and gives better typography and exact brand fidelity
+  than any JS PDF generator. Palette and type match the public site exactly
+  (paper #ffffff, ink #0a0a0a, muted #56565c, teal #0d7f79, Archivo +
+  Instrument Sans). The letterhead is typographic on purpose: `chm-logo.png`
+  is a white mark and vanishes on white paper.
+- The Annual Coverage Record assembles itself from every FINAL report in the
+  period plus that client's shutoff alerts. Nothing in it is typed by hand.
+  `LEGAL_DISCLAIMER` from `src/lib/brand.ts` is on every printed page and stays
+  there.
+
 ## Domain semantics (do not change without asking Ryder)
 
 - Payment.status: `UPCOMING` = scheduled/draft in Square, not sent yet.

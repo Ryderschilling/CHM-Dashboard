@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { money, num, fmtDate, fmtTime, toInputDate, monthStart } from "@/lib/format";
-import { AddJobButton, JobActions } from "@/components/launchers";
+import { AddJobButton, JobActions, ReportVisitButton } from "@/components/launchers";
 import { Empty } from "@/components/ui";
 import StatTile from "@/components/StatTile";
 import Reveal from "@/components/Reveal";
@@ -108,6 +108,13 @@ export default async function JobsPage({
       calendarId(),
       prisma.job.count({ where: { date: { gte: today }, status: "SCHEDULED" } }),
     ]);
+
+  // Checklists for the "Report a visit" launcher in the header.
+  const checkAreas = await prisma.propertyCheckArea.findMany({
+    where: { active: true },
+    select: { id: true, propertyId: true, label: true, category: true, sortOrder: true },
+    orderBy: { sortOrder: "asc" },
+  });
 
   let calendars: { id: string; summary: string }[] = [];
   if (connected) {
@@ -267,6 +274,12 @@ export default async function JobsPage({
             lastNote={lastNote}
             calendars={calendars}
             currentCalendarId={calId}
+          />
+          <ReportVisitButton
+            clients={clients}
+            properties={properties}
+            areas={checkAreas}
+            primary={false}
           />
           <AddJobButton clients={clients} workers={workers} properties={properties} autoOpen={sp.new === "1"} />
         </div>

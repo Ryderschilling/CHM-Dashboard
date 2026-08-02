@@ -23,6 +23,8 @@ import { deleteWorker } from "@/actions/workers";
 import ShutoffForm, { type ShutoffDefaults } from "./forms/ShutoffForm";
 import AlertForm, { type AlertDefaults } from "./forms/AlertForm";
 import CoverageForm, { type CoverageDefaults } from "./forms/CoverageForm";
+import VisitReportForm, { type VisitDefaults, type AreaOpt } from "./forms/VisitReportForm";
+import { deleteVisitReport, finalizeVisitReport } from "@/actions/visits";
 import {
   deleteShutoffDevice,
   deleteShutoffAlert,
@@ -533,6 +535,86 @@ export function CoverageActions({
       <ConfirmDelete action={deleteCoverageRecord} id={record.id} />
       <Modal title="Edit coverage record" open={open} onClose={() => setOpen(false)} wide>
         <CoverageForm defaults={record} clients={clients} onDone={() => setOpen(false)} />
+      </Modal>
+    </span>
+  );
+}
+
+/* ---------------- Visit reports ---------------- */
+
+export function ReportVisitButton({
+  clients,
+  properties,
+  areas,
+  defaults,
+  label = "Report a visit",
+  primary = true,
+  small = false,
+  autoOpen = false,
+}: {
+  clients: Opt[];
+  properties: PropOpt[];
+  areas: AreaOpt[];
+  defaults?: VisitDefaults;
+  label?: string;
+  primary?: boolean;
+  small?: boolean;
+  autoOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(autoOpen);
+  return (
+    <>
+      <button
+        className={`btn ${primary ? "btn-primary" : ""} ${small ? "btn-sm" : ""}`}
+        onClick={() => setOpen(true)}
+      >
+        {!small && <IconPlus size={14} />} {label}
+      </button>
+      <Modal title="Home watch visit report" open={open} onClose={() => setOpen(false)} wide>
+        <VisitReportForm
+          defaults={defaults}
+          clients={clients}
+          properties={properties}
+          areas={areas}
+          onDone={() => setOpen(false)}
+        />
+      </Modal>
+    </>
+  );
+}
+
+export function VisitReportActions({
+  report,
+  clients,
+  properties,
+  areas,
+}: {
+  report: VisitDefaults & { id: string; status: string };
+  clients: Opt[];
+  properties: PropOpt[];
+  areas: AreaOpt[];
+}) {
+  const [open, setOpen] = useState(false);
+  const { pending, fire } = useFire(finalizeVisitReport);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {report.status === "DRAFT" && (
+        <button className="btn btn-sm" disabled={pending} onClick={() => fire({ id: report.id })}>
+          {pending ? "..." : "Finalize"}
+        </button>
+      )}
+      <button className="btn btn-sm" onClick={() => setOpen(true)} title="Edit">
+        <IconEdit size={13} />
+      </button>
+      <ConfirmDelete action={deleteVisitReport} id={report.id} />
+      <Modal title="Edit visit report" open={open} onClose={() => setOpen(false)} wide>
+        <VisitReportForm
+          defaults={report}
+          clients={clients}
+          properties={properties}
+          areas={areas}
+          onDone={() => setOpen(false)}
+        />
       </Modal>
     </span>
   );

@@ -337,7 +337,7 @@ async function Body({ searchParams }: { searchParams: Promise<{ new?: string }> 
                   <th className="font-medium pb-2 pr-3">Send by</th>
                   <th className="font-medium pb-2 pr-3">Status</th>
                   <th className="font-medium pb-2 pr-3">Fee</th>
-                  <th className="font-medium pb-2 pr-3">PDF</th>
+                  <th className="font-medium pb-2 pr-3">Record</th>
                   <th className="font-medium pb-2" />
                 </tr>
               </thead>
@@ -375,12 +375,18 @@ async function Body({ searchParams }: { searchParams: Promise<{ new?: string }> 
                         {r.fee ? money(r.fee) : "Included"}
                       </td>
                       <td className="py-2.5 pr-3">
-                        {r.fileUrl ? (
-                          <a href={r.fileUrl} target="_blank" rel="noreferrer" className="text-[var(--teal)] hover:underline">
-                            Open
+                        <Link
+                          href={`/print/coverage/${r.id}`}
+                          target="_blank"
+                          className="text-[var(--teal)] hover:underline"
+                          title="Builds the PDF from every finalized visit report in the period"
+                        >
+                          Build PDF
+                        </Link>
+                        {r.fileUrl && (
+                          <a href={r.fileUrl} target="_blank" rel="noreferrer" className="ml-2 text-[var(--mut)] hover:underline">
+                            Saved copy
                           </a>
-                        ) : (
-                          <span className="text-[var(--mut)]">Not built</span>
                         )}
                       </td>
                       <td className="py-2.5 text-right">

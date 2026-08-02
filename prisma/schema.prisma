@@ -84,6 +84,23 @@ enum AlertSeverity {
 }
 
 /// Lifecycle of one year's Coverage Record PDF for one client.
+
+/// A visit report is DRAFT while Ryder is still filling it in and FINAL once
+/// it is locked. FINAL reports are what the Coverage Record is built from.
+enum VisitReportStatus {
+  DRAFT
+  FINAL
+}
+
+/// State of one checked area on one visit. OK is the default on every area,
+/// which is the whole point: the record has to affirmatively document the
+/// areas that were fine, not only the ones that were not.
+enum FindingState {
+  OK
+  ISSUE
+  NA
+}
+
 enum CoverageStatus {
   ENROLLED
   DUE
@@ -131,6 +148,7 @@ model Client {
 
   shutoffDevices  ShutoffDevice[]
   coverageRecords CoverageRecord[]
+  visitReports    VisitReport[]
 }
 
 model Property {
@@ -152,6 +170,8 @@ model Property {
 
   jobs           Job[]
   shutoffDevices ShutoffDevice[]
+  checkAreas     PropertyCheckArea[]
+  visitReports   VisitReport[]
 }
 
 model Payment {
@@ -223,7 +243,8 @@ model Job {
   gcalUpdated  DateTime?
   syncedAt     DateTime?
 
-  tasks Task[]
+  tasks       Task[]
+  visitReport VisitReport?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -377,6 +398,113 @@ model CoverageRecord {
   @@index([clientId])
   @@index([dueDate])
   @@index([status])
+}
+
+/// The list of areas checked at ONE property, editable per house. Seeded from
+/// the default template in src/lib/checkAreas.ts, then trimmed or added to.
+/// A house with no pool should not have a pool line in its record.
+model PropertyCheckArea {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  label      String
+  /// Interior / Systems / Exterior / Security. Groups the form and the PDF.
+  category   String   @default("Interior")
+  sortOrder  Int      @default(0)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@index([propertyId, sortOrder])
+}
+
+/// One home watch visit, written up on site. This is the evidence record.
+/// Reporting a visit also writes back to its Job (hours, cost, charge, DONE)
+/// so the existing money model in lib/jobValue.ts and lib/metrics.ts picks it
+/// up. Do NOT build a second accounting path here.
+model VisitReport {
+  id         String    @id @default(cuid())
+  clientId   String
+  client     Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  /// The calendar job this visit belongs to. One report per job.
+  jobId      String?   @unique
+  job        Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  visitDate     DateTime
+  /// Minutes on site. Mirrored onto Job.laborHours so time reporting works.
+  minutesOnSite Int?
+  weather       String?
+
+  status        VisitReportStatus @default(DRAFT)
+  /// What the client is told. Goes on the visit PDF verbatim.
+  summary       String?
+  /// Never shown to the client, never in the PDF.
+  internalNotes String?
+
+  /// Billable beyond the plan. Mirrored onto Job.chargeAmount.
+  chargeAmount Decimal? @db.Decimal(10, 2)
+  /// Paid out to a helper for this visit. Mirrored onto Job.laborCost.
+  laborCost    Decimal? @db.Decimal(10, 2)
+  /// Out of pocket on this visit (filters, supplies). Creates an Expense row.
+  materialCost Decimal? @db.Decimal(10, 2)
+  materialNote String?
+
+  findings VisitFinding[]
+  photos   VisitPhoto[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([visitDate])
+  @@index([status])
+}
+
+/// One area, on one visit, with the state it was found in.
+/// `label` is a SNAPSHOT taken at report time on purpose. Renaming an area
+/// later must not rewrite what a past record says.
+model VisitFinding {
+  id        String       @id @default(cuid())
+  reportId  String
+  report    VisitReport  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  areaId    String?
+  label     String
+  category  String       @default("Interior")
+  state     FindingState @default(OK)
+  note      String?
+  sortOrder Int          @default(0)
+
+  photos VisitPhoto[]
+
+  @@index([reportId, sortOrder])
+}
+
+/// Photos live as bytes in Postgres so there is exactly one source of truth
+/// across localhost and Vercel, and no storage account to set up. The form
+/// resizes to 1400px / JPEG 0.7 in the browser before upload, so a photo is
+/// roughly 120-180KB. /visits shows total storage used. If that number gets
+/// close to the Neon plan limit, move `data` to Vercel Blob and keep the row.
+model VisitPhoto {
+  id        String        @id @default(cuid())
+  reportId  String
+  report    VisitReport   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  /// Optional link to the area this photo documents.
+  findingId String?
+  finding   VisitFinding? @relation(fields: [findingId], references: [id], onDelete: SetNull)
+
+  data      Bytes
+  mimeType  String  @default("image/jpeg")
+  bytes     Int     @default(0)
+  width     Int?
+  height    Int?
+  caption   String?
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([reportId, sortOrder])
+  @@index([findingId])
 }
 
 /// Maps Square customer IDs to clients. One client can own several
