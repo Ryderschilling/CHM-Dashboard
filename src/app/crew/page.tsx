@@ -4,6 +4,7 @@ import { getCrewWorker } from "@/lib/crew";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { Empty, StatusBadge } from "@/components/ui";
 import Reveal from "@/components/Reveal";
+import { CrewCheckCircle } from "@/components/CrewJobTools";
 
 export const dynamic = "force-dynamic";
 
@@ -136,38 +137,47 @@ export default async function CrewHome({
                 <div>
                   {d.jobs.map((j) => {
                     const doneSteps = j.tasks.filter((t) => t.done).length;
+                    const isDone = j.status === "DONE";
                     return (
-                      <Link
+                      <div
                         key={j.id}
-                        href={`/crew/jobs/${j.id}`}
-                        className="flex items-start gap-3 px-4 py-3 border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)] transition-colors"
+                        className={`flex items-center border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)] transition-colors ${isDone ? "opacity-60" : ""}`}
                       >
-                        <div className="shrink-0 w-[62px] pt-0.5 text-[12px] tabular-nums text-[var(--mut)]">
-                          {j.allDay ? "All day" : fmtTime(j.date)}
+                        <div className="pl-4 py-3">
+                          <CrewCheckCircle jobId={j.id} done={isDone} />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-[14px] font-medium ${j.status === "DONE" ? "text-[var(--mut)] line-through" : ""}`}>
-                              {j.title}
-                            </span>
-                            {j.status !== "SCHEDULED" && <StatusBadge status={j.status} />}
+                        <Link
+                          href={`/crew/jobs/${j.id}`}
+                          className="flex items-start gap-3 flex-1 min-w-0 px-3 py-3"
+                        >
+                          <div className="shrink-0 w-[58px] pt-0.5 text-[12px] tabular-nums text-[var(--mut)]">
+                            {j.allDay ? "All day" : fmtTime(j.date)}
                           </div>
-                          <p className="text-[12px] text-[var(--mut)] truncate mt-0.5">
-                            {[
-                              j.client?.name,
-                              j.property?.address ?? j.location,
-                              j.tasks.length > 0 ? `${doneSteps}/${j.tasks.length} steps` : null,
-                            ]
-                              .filter(Boolean)
-                              .join("  ·  ")}
-                          </p>
-                        </div>
-                        <span className="shrink-0 pt-1 text-[var(--mut)]">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="9 18 15 12 9 6" />
-                          </svg>
-                        </span>
-                      </Link>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-[14px] font-medium ${isDone ? "text-[var(--mut)] line-through" : ""}`}>
+                                {j.title}
+                              </span>
+                              {isDone && <StatusBadge status="DONE" />}
+                              {j.status === "CANCELED" && <StatusBadge status="CANCELED" />}
+                            </div>
+                            <p className="text-[12px] text-[var(--mut)] truncate mt-0.5">
+                              {[
+                                j.client?.name,
+                                j.property?.address ?? j.location,
+                                j.tasks.length > 0 ? `${doneSteps}/${j.tasks.length} steps` : null,
+                              ]
+                                .filter(Boolean)
+                                .join("  ·  ")}
+                            </p>
+                          </div>
+                          <span className="shrink-0 pt-1 pr-4 text-[var(--mut)]">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                          </span>
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>

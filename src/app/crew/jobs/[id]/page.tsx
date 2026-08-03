@@ -6,6 +6,7 @@ import { fmtDate, fmtTime } from "@/lib/format";
 import { StatusBadge } from "@/components/ui";
 import Reveal from "@/components/Reveal";
 import { CrewChecklist, CrewDoneButton, CrewNoteForm } from "@/components/CrewJobTools";
+import CrewVisitReportForm from "@/components/forms/CrewVisitReportForm";
 
 export const dynamic = "force-dynamic";
 
@@ -44,9 +45,19 @@ export default async function CrewJobPage({
       client: { select: { name: true } },
       property: true,
       tasks: { select: { id: true, title: true, done: true }, orderBy: { createdAt: "asc" } },
+      visitReport: { select: { id: true, status: true, createdAt: true } },
     },
   });
   if (!job) notFound();
+
+  // The house's own walkthrough list, for the end-of-visit report.
+  const areas = job.propertyId
+    ? await prisma.propertyCheckArea.findMany({
+        where: { propertyId: job.propertyId, active: true },
+        select: { id: true, label: true, category: true, sortOrder: true },
+        orderBy: { sortOrder: "asc" },
+      })
+    : [];
 
   const p = job.property;
   const address = p?.address ?? job.location;
@@ -122,6 +133,32 @@ export default async function CrewJobPage({
             </p>
           )}
           <CrewChecklist tasks={job.tasks} />
+        </div>
+
+        {/* End of visit report */}
+        <div className="card p-4">
+          <p className="eyebrow mb-1">End of visit report</p>
+          {job.visitReport ? (
+            <div className="flex items-center gap-2.5 py-2">
+              <StatusBadge status={job.visitReport.status === "DRAFT" ? "DRAFTED" : "DONE"} />
+              <p className="text-[13.5px] text-[var(--sec)]">
+                {job.visitReport.status === "DRAFT"
+                  ? "Report filed. Ryder will review it before it goes to the client."
+                  : "Report finalized."}
+              </p>
+            </div>
+          ) : job.clientId ? (
+            <>
+              <p className="text-[12.5px] text-[var(--mut)] mb-4">
+                Fill this out before you leave the property. Photos of anything flagged.
+              </p>
+              <CrewVisitReportForm jobId={job.id} areas={areas} />
+            </>
+          ) : (
+            <p className="text-[13px] text-[var(--mut)] py-2">
+              No client is linked to this job, so there is no report to file. Use a note instead.
+            </p>
+          )}
         </div>
 
         {/* Wrap up */}

@@ -6,7 +6,8 @@ import { prisma } from "@/lib/db";
 import { CREW_COOKIE, crewWorkerId } from "@/lib/auth";
 import { pushJob } from "@/lib/gcalSync";
 import { fmtDate, fmtTime } from "@/lib/format";
-import { reqStr } from "./parse";
+import { readFindings, savePhotos } from "@/lib/reportSave";
+import { numOrNull, reqStr, str } from "./parse";
 
 /**
  * Actions a crew member can fire from their phone. Every one of them
@@ -54,6 +55,58 @@ export async function crewSetJobDone(fd: FormData) {
   await prisma.job.update({ where: { id }, data: { status: done ? "DONE" : "SCHEDULED" } });
   await pushJob(id);
   revalidatePath("/crew", "layout");
+}
+
+/**
+ * The end-of-visit report, filed from the field.
+ * Differences from the admin save on purpose:
+ * - client/property/date come from the JOB, never from the form
+ * - status is forced to DRAFT — Ryder reviews and finalizes before anything
+ *   reaches a client or the annual record
+ * - no money fields exist on the crew form and none are written here; the
+ *   job's laborCost/chargeAmount are left untouched for Ryder to settle
+ * - one report per job; a second submit is rejected
+ */
+export async function crewSubmitVisitReport(fd: FormData) {
+  const worker = await requireCrew();
+  const jobId = reqStr(fd, "jobId");
+  const job = await myJob(jobId, worker.id);
+  if (!job.clientId) throw new Error("This job has no client attached yet. Send Ryder a note instead.");
+
+  const existing = await prisma.visitReport.findUnique({ where: { jobId }, select: { id: true } });
+  if (existing) throw new Error("A report is already filed for this visit.");
+
+  const minutesOnSite = numOrNull(fd, "minutesOnSite");
+  const internal = str(fd, "internalNotes");
+
+  const report = await prisma.visitReport.create({
+    data: {
+      clientId: job.clientId,
+      propertyId: job.propertyId,
+      jobId,
+      visitDate: job.date,
+      minutesOnSite,
+      weather: str(fd, "weather"),
+      summary: str(fd, "summary"),
+      internalNotes: internal ? `Filed by ${worker.name}.\n${internal}` : `Filed by ${worker.name}.`,
+      status: "DRAFT",
+      findings: { create: readFindings(fd) },
+    },
+  });
+
+  await savePhotos(fd, report.id);
+
+  // The visit happened: mark the job done and record the time.
+  // Money columns are deliberately not touched.
+  await prisma.job.update({
+    where: { id: jobId },
+    data: {
+      status: "DONE",
+      ...(minutesOnSite ? { laborHours: Number((minutesOnSite / 60).toFixed(2)) } : {}),
+    },
+  });
+  await pushJob(jobId);
+  revalidatePath("/", "layout");
 }
 
 /** Append a stamped note to the job, visible on the admin side too. */

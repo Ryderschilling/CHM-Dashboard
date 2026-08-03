@@ -50,6 +50,29 @@ export function CrewChecklist({ tasks }: { tasks: CrewTask[] }) {
   );
 }
 
+/** The tap-to-complete circle on each schedule row. Toggles done in place. */
+export function CrewCheckCircle({ jobId, done }: { jobId: string; done: boolean }) {
+  const fire = useFire(crewSetJobDone);
+  return (
+    <button
+      type="button"
+      onClick={() => fire.fire({ id: jobId, done: done ? "false" : "true" })}
+      disabled={fire.pending}
+      aria-label={done ? "Mark not done" : "Mark done"}
+      title={done ? "Done · tap to undo" : "Mark done"}
+      className={`shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${
+        done
+          ? "bg-[var(--good)] border-[var(--good)] text-[#0a0a0b]"
+          : "border-[var(--border)] hover:border-[var(--good)] text-transparent hover:text-[var(--border)]"
+      } ${fire.pending ? "opacity-50" : ""}`}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    </button>
+  );
+}
+
 /** One big obvious button: mark the visit done, or undo a mis-tap. */
 export function CrewDoneButton({ jobId, done }: { jobId: string; done: boolean }) {
   const fire = useFire(crewSetJobDone);
