@@ -15,6 +15,7 @@
  */
 import { prisma } from "@/lib/db";
 import { gcal, calendarId, googleConnected, setState, KEY_LAST_SYNC, KEY_SYNC_NOTE, type GEvent } from "@/lib/google";
+import { matchStandard } from "@/lib/jobTime";
 import type { Job } from "@prisma/client";
 
 const TZ = "America/Chicago";
@@ -76,7 +77,9 @@ export function stripBlock(description: string | null | undefined): string {
   return (description.slice(0, i) + tail).trim();
 }
 
-type JobForPush = Job & {
+type JobForPush = Omit<Job, "laborHours"> & {
+  /** Decimal off the row, or a plain number when a JobStandard filled it in. */
+  laborHours: Job["laborHours"] | number;
   client?: { name: string } | null;
   worker?: { name: string } | null;
   tasks?: { title: string; done: boolean }[];
@@ -298,7 +301,7 @@ export async function syncCalendar(): Promise<SyncResult> {
 // ---------------------------------------------------------------------- push
 
 async function loadForPush(jobId: string) {
-  return prisma.job.findUnique({
+  const job = await prisma.job.findUnique({
     where: { id: jobId },
     include: {
       client: { select: { name: true } },
@@ -306,6 +309,17 @@ async function loadForPush(jobId: string) {
       tasks: { select: { title: true, done: true }, orderBy: { createdAt: "asc" } },
     },
   });
+  if (!job || job.laborHours != null) return job;
+
+  // No measured time on this one. Fall back to the standard for this kind of
+  // job so the phone still shows how long it takes. In memory only: the Job
+  // row keeps laborHours null, because null means "nobody timed this visit".
+  const standards = await prisma.jobStandard.findMany({
+    where: { active: true },
+    select: { id: true, label: true, minutes: true, gcalSeriesId: true, titleMatch: true, active: true, clientId: true },
+  });
+  const std = matchStandard(job, standards);
+  return std ? { ...job, laborHours: std.minutes / 60 } : job;
 }
 
 /**

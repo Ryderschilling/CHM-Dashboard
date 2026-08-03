@@ -8,6 +8,7 @@ import Reveal from "@/components/Reveal";
 import CalendarSync from "@/components/CalendarSync";
 import JobChecklist from "@/components/JobChecklist";
 import { valueJobs, fmtHours } from "@/lib/jobValue";
+import { timeJobs, type StandardLite } from "@/lib/jobTime";
 import {
   googleConfigured,
   googleConnected,
@@ -91,6 +92,7 @@ export default async function JobsPage({
           client: { select: { id: true, name: true, cadence: true, planAmount: true } },
           worker: { select: { id: true, name: true } },
           tasks: { select: { id: true, title: true, done: true }, orderBy: { createdAt: "asc" } },
+          visitReport: { select: { id: true } },
         },
         orderBy: view === "history" ? { date: "desc" } : { date: "asc" },
         take: 400,
@@ -108,6 +110,12 @@ export default async function JobsPage({
       calendarId(),
       prisma.job.count({ where: { date: { gte: today }, status: "SCHEDULED" } }),
     ]);
+
+  // Standard times, so "Done" opens with the number already in the box.
+  const standards: StandardLite[] = await prisma.jobStandard.findMany({
+    where: { active: true },
+    select: { id: true, label: true, minutes: true, gcalSeriesId: true, titleMatch: true, active: true, clientId: true },
+  });
 
   // Checklists for the "Report a visit" launcher in the header.
   const checkAreas = await prisma.propertyCheckArea.findMany({
@@ -127,6 +135,7 @@ export default async function JobsPage({
 
   // --- money ---
   const valued = valueJobs(jobs);
+  const timed = timeJobs(jobs, standards);
   const monthValued = valueJobs(monthJobs);
   const doneMTD = monthJobs.filter((j) => j.status === "DONE");
   const monthValue = doneMTD.reduce((s, j) => s + (monthValued.get(j.id)?.value ?? 0), 0);
@@ -244,6 +253,28 @@ export default async function JobsPage({
               notes: j.notes,
               gcalEventId: j.gcalEventId,
             }}
+            suggestedHours={
+              timed.get(j.id)?.source === "standard" ? timed.get(j.id)?.hours : null
+            }
+            areas={checkAreas}
+            visitReportId={j.visitReport?.id ?? null}
+            visitDefaults={
+              j.clientId
+                ? {
+                    clientId: j.clientId,
+                    propertyId: j.propertyId,
+                    jobId: j.id,
+                    visitDate: toInputDate(j.date),
+                    // Start from the measured time, else this job's standard.
+                    minutesOnSite: (() => {
+                      const h = timed.get(j.id)?.hours;
+                      return h == null ? null : Math.round(h * 60);
+                    })(),
+                    chargeAmount: j.chargeAmount == null ? null : num(j.chargeAmount),
+                    laborCost: num(j.laborCost) || null,
+                  }
+                : undefined
+            }
           />
         </div>
       </div>

@@ -149,6 +149,7 @@ model Client {
   shutoffDevices  ShutoffDevice[]
   coverageRecords CoverageRecord[]
   visitReports    VisitReport[]
+  jobStandards    JobStandard[]
 }
 
 model Property {
@@ -172,6 +173,46 @@ model Property {
   shutoffDevices ShutoffDevice[]
   checkAreas     PropertyCheckArea[]
   visitReports   VisitReport[]
+  jobStandards   JobStandard[]
+}
+
+/// How long a job normally takes.
+///
+/// Ryder times a job once, records the minutes here, and every occurrence of
+/// that job inherits the number. This is what makes "how many hours does my
+/// week actually cost me" and "what do I really earn per hour on this client"
+/// answerable without him retyping a time on every single visit.
+///
+/// Matching a Job to a standard, in order:
+///   1. gcalSeriesId  - exact, and the one to prefer. A recurring Google
+///      Calendar series is the same job repeating, by definition.
+///   2. titleMatch    - case-insensitive substring of the job title. Covers
+///      one-off events and anything created by hand in CHM.
+///
+/// An explicit `Job.laborHours` ALWAYS wins over the standard. The standard is
+/// the estimate that fills the gap, never an overwrite of a measured number.
+model JobStandard {
+  id           String    @id @default(cuid())
+  /// What Ryder calls this job, e.g. "Beth Tedesco Mail".
+  label        String
+  /// How long it takes, in minutes. Stored as minutes because that is how he
+  /// measures it; hours are derived for display and math.
+  minutes      Int
+  clientId     String?
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  propertyId   String?
+  property     Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  /// The recurring Google Calendar series id this covers. Unique so one series
+  /// can never end up with two competing standards.
+  gcalSeriesId String?   @unique
+  /// Fallback matcher, case-insensitive substring of the job title.
+  titleMatch   String?
+  active       Boolean   @default(true)
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([clientId])
 }
 
 model Payment {

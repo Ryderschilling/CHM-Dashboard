@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { prisma } from "@/lib/db";
 import { getReport, loadFormOptions, minutesLabel, fmtBytes } from "@/lib/visits";
+import { valueJobs, fmtHours } from "@/lib/jobValue";
 import { money, num, fmtDate, toInputDate } from "@/lib/format";
 import { categoryRank, STATE_LABEL } from "@/lib/checkAreas";
 import { VisitReportActions } from "@/components/launchers";
@@ -21,6 +23,27 @@ export default async function VisitDetail({ params }: { params: Promise<{ id: st
 
   const issues = r.findings.filter((f) => f.state === "ISSUE");
   const checked = r.findings.filter((f) => f.state !== "NA").length;
+
+  // What this visit is worth against what the client actually pays.
+  // valueJobs needs the client's WHOLE month, because a monthly plan is split
+  // across that month's visits. Pulling one job in isolation would read high.
+  const mStart = new Date(r.visitDate.getFullYear(), r.visitDate.getMonth(), 1);
+  const mEnd = new Date(r.visitDate.getFullYear(), r.visitDate.getMonth() + 1, 1);
+  const [plan, monthJobs] = await Promise.all([
+    prisma.client.findUnique({
+      where: { id: r.clientId },
+      select: { planName: true, planAmount: true, cadence: true },
+    }),
+    prisma.job.findMany({
+      where: { clientId: r.clientId, date: { gte: mStart, lt: mEnd }, status: { not: "CANCELED" } },
+      include: { client: { select: { cadence: true, planAmount: true } } },
+    }),
+  ]);
+  const v = r.jobId ? valueJobs(monthJobs).get(r.jobId) ?? null : null;
+  const hours = r.minutesOnSite ? r.minutesOnSite / 60 : null;
+  const outOfPocket = num(r.laborCost) + num(r.materialCost);
+  const kept = v ? v.value - outOfPocket : null;
+  const perHour = kept != null && hours ? kept / hours : null;
 
   return (
     <Reveal className="in">
@@ -137,6 +160,39 @@ export default async function VisitDetail({ params }: { params: Promise<{ id: st
         <div className="space-y-5">
           <div className="card p-5">
             <SectionHeader title="Money on this visit" sub="These already flow into Jobs and your monthly profit" />
+
+            {v && v.value > 0 && (
+              <div className="rounded-xl bg-[var(--surface-2)] p-3.5 mb-4">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="eyebrow mb-1">What this visit is worth</p>
+                    <p className="stat-num text-[22px] leading-none">{money(v.value)}</p>
+                  </div>
+                  {perHour != null && (
+                    <div className="text-right">
+                      <p className="eyebrow mb-1">Your rate</p>
+                      <p
+                        className="stat-num text-[22px] leading-none"
+                        style={{
+                          color:
+                            perHour < 25 ? "var(--bad)" : perHour < 50 ? "var(--warn)" : "var(--good)",
+                        }}
+                      >
+                        {money(perHour)}/hr
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[12px] text-[var(--mut)] mt-2.5">
+                  {v.fromPlan
+                    ? `${plan?.planName ? `${plan.planName}, ` : ""}${money(num(plan?.planAmount))} a month split across ${v.planSplit} visit${v.planSplit === 1 ? "" : "s"} this month`
+                    : "Charged directly on this visit, not drawn from a plan"}
+                  {hours ? ` · ${minutesLabel(r.minutesOnSite)} on site` : " · no time logged yet"}
+                  {outOfPocket > 0 ? ` · ${money(outOfPocket)} out of pocket` : ""}
+                </p>
+              </div>
+            )}
+
             <div className="text-[13px] space-y-1.5">
               <p className="flex justify-between border-b border-[var(--border)] pb-1.5">
                 <span className="text-[var(--mut)]">Extra charge</span>
@@ -158,7 +214,7 @@ export default async function VisitDetail({ params }: { params: Promise<{ id: st
               <p className="flex justify-between pt-1">
                 <span className="text-[var(--mut)]">Time on site</span>
                 <span className="tabular-nums font-medium">
-                  {r.minutesOnSite ? minutesLabel(r.minutesOnSite) : "Not logged"}
+                  {r.minutesOnSite ? `${minutesLabel(r.minutesOnSite)} (${fmtHours(hours)})` : "Not logged"}
                 </span>
               </p>
             </div>

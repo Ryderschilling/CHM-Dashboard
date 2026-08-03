@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import Modal from "./Modal";
-import { IconEdit, IconPlus } from "./icons";
+import { IconEdit, IconPlus, IconDoc } from "./icons";
 import ClientForm, { type ClientDefaults } from "./forms/ClientForm";
 import PaymentForm, { type PaymentDefaults } from "./forms/PaymentForm";
 import JobForm, { type JobDefaults } from "./forms/JobForm";
@@ -24,7 +24,9 @@ import ShutoffForm, { type ShutoffDefaults } from "./forms/ShutoffForm";
 import AlertForm, { type AlertDefaults } from "./forms/AlertForm";
 import CoverageForm, { type CoverageDefaults } from "./forms/CoverageForm";
 import VisitReportForm, { type VisitDefaults, type AreaOpt } from "./forms/VisitReportForm";
+import JobStandardForm, { type JobStandardDefaults } from "./forms/JobStandardForm";
 import { deleteVisitReport, finalizeVisitReport } from "@/actions/visits";
+import { deleteJobStandard } from "@/actions/jobTime";
 import {
   deleteShutoffDevice,
   deleteShutoffAlert,
@@ -160,12 +162,18 @@ export function AddJobButton({
 
 function CompleteJobModal({
   job,
+  suggestedHours,
   open,
   onClose,
+  onFullReport,
 }: {
   job: JobDefaults & { id: string; title?: string };
+  /** From a JobStandard when nobody has timed this visit yet. */
+  suggestedHours?: number | null;
   open: boolean;
   onClose: () => void;
+  /** Hand off to the full visit report instead: checklist, photos, PDF. */
+  onFullReport?: () => void;
 }) {
   const { pending, onSubmit } = useSubmit(completeJob, onClose);
   return (
@@ -175,7 +183,10 @@ function CompleteJobModal({
         <p className="text-[13.5px] text-[var(--sec)] -mt-1">{job.title}</p>
         <FormGrid>
           <Field label="Time on the job (hours)">
-            <input name="laborHours" type="number" step="0.25" min="0" autoFocus defaultValue={job.laborHours ?? ""} className="input" placeholder="0.75" />
+            <input name="laborHours" type="number" step="0.25" min="0" autoFocus defaultValue={job.laborHours ?? suggestedHours ?? ""} className="input" placeholder="0.75" />
+            {job.laborHours == null && suggestedHours != null && (
+              <p className="text-[11.5px] text-[var(--mut)] mt-1">Standard time for this job. Change it if today was different.</p>
+            )}
           </Field>
           <Field label="Paid out ($)">
             <input name="laborCost" type="number" step="0.01" min="0" defaultValue={job.laborCost || ""} className="input" placeholder="0 if you did it" />
@@ -188,12 +199,27 @@ function CompleteJobModal({
           <input type="checkbox" name="billClient" className="accent-[var(--teal)] w-4 h-4" />
           Also put this charge on the client tab as due
         </label>
-        <div className="flex justify-end gap-2 pt-1">
-          <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" disabled={pending}>
-            {pending ? "Saving..." : "Mark done"}
-          </button>
+        <div className="flex flex-wrap justify-between gap-2 pt-1">
+          {onFullReport ? (
+            <button type="button" className="btn" onClick={onFullReport}>
+              Write the full report instead
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <button type="button" className="btn" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" disabled={pending}>
+              {pending ? "Saving..." : "Mark done"}
+            </button>
+          </div>
         </div>
+        {onFullReport && (
+          <p className="text-[11.5px] text-[var(--mut)]">
+            The full report adds the walkthrough checklist, photos, and a PDF the client can
+            hand to an adjuster. It writes the same time and money back onto this job.
+          </p>
+        )}
       </form>
     </Modal>
   );
@@ -204,16 +230,33 @@ export function JobActions({
   clients,
   workers,
   properties,
+  suggestedHours,
+  areas,
+  visitDefaults,
+  visitReportId,
 }: {
   job: JobDefaults & { id: string; status: string };
   clients: Opt[];
   workers: Opt[];
   properties: PropOpt[];
+  suggestedHours?: number | null;
+  /** Checklist areas, so Done can hand off to a full visit report. */
+  areas?: AreaOpt[];
+  visitDefaults?: VisitDefaults;
+  /** Set when this job already has a report. Links to it instead of offering one. */
+  visitReportId?: string | null;
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [doneOpen, setDoneOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const canReport = Boolean(areas && visitDefaults && !visitReportId);
   return (
     <span className="inline-flex items-center gap-1.5">
+      {visitReportId && (
+        <a className="btn btn-sm" href={`/visits/${visitReportId}`} title="Open the visit report">
+          <IconDoc size={13} />
+        </a>
+      )}
       {job.status === "SCHEDULED" && (
         <button className="btn btn-sm" onClick={() => setDoneOpen(true)}>
           Done
@@ -226,7 +269,31 @@ export function JobActions({
       <Modal title="Edit job" open={editOpen} onClose={() => setEditOpen(false)} wide>
         <JobForm defaults={job} clients={clients} workers={workers} properties={properties} onDone={() => setEditOpen(false)} />
       </Modal>
-      <CompleteJobModal job={job} open={doneOpen} onClose={() => setDoneOpen(false)} />
+      <CompleteJobModal
+        job={job}
+        suggestedHours={suggestedHours}
+        open={doneOpen}
+        onClose={() => setDoneOpen(false)}
+        onFullReport={
+          canReport
+            ? () => {
+                setDoneOpen(false);
+                setReportOpen(true);
+              }
+            : undefined
+        }
+      />
+      {canReport && (
+        <Modal title="Home watch visit report" open={reportOpen} onClose={() => setReportOpen(false)} wide>
+          <VisitReportForm
+            defaults={visitDefaults}
+            clients={clients}
+            properties={properties}
+            areas={areas!}
+            onDone={() => setReportOpen(false)}
+          />
+        </Modal>
+      )}
     </span>
   );
 }
@@ -613,6 +680,72 @@ export function VisitReportActions({
           clients={clients}
           properties={properties}
           areas={areas}
+          onDone={() => setOpen(false)}
+        />
+      </Modal>
+    </span>
+  );
+}
+
+/* ---------------- Standard job times ---------------- */
+
+export function AddJobStandardButton({
+  clients,
+  properties,
+  defaults,
+  label = "Add a standard time",
+  primary = true,
+  small = false,
+}: {
+  clients: Opt[];
+  properties: PropOpt[];
+  defaults?: JobStandardDefaults;
+  label?: string;
+  primary?: boolean;
+  small?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        className={`btn ${small ? "btn-sm" : ""} ${primary ? "btn-primary" : ""}`}
+        onClick={() => setOpen(true)}
+      >
+        <IconPlus size={small ? 13 : 14} /> {label}
+      </button>
+      <Modal title="How long does it take?" open={open} onClose={() => setOpen(false)} wide>
+        <JobStandardForm
+          defaults={defaults}
+          clients={clients}
+          properties={properties}
+          onDone={() => setOpen(false)}
+        />
+      </Modal>
+    </>
+  );
+}
+
+export function JobStandardActions({
+  standard,
+  clients,
+  properties,
+}: {
+  standard: JobStandardDefaults & { id: string };
+  clients: Opt[];
+  properties: PropOpt[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button className="btn btn-sm" onClick={() => setOpen(true)} title="Edit">
+        <IconEdit size={13} />
+      </button>
+      <ConfirmDelete action={deleteJobStandard} id={standard.id} />
+      <Modal title={`Edit ${standard.label ?? "standard"}`} open={open} onClose={() => setOpen(false)} wide>
+        <JobStandardForm
+          defaults={standard}
+          clients={clients}
+          properties={properties}
           onDone={() => setOpen(false)}
         />
       </Modal>

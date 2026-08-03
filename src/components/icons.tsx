@@ -170,3 +170,10 @@ export const IconDoc = (p: IconProps) => (
     <path d="M9 13h6M9 17h4" />
   </svg>
 );
+
+export const IconClock = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <polyline points="12 7 12 12 15.5 14" />
+  </svg>
+);
