@@ -25,7 +25,7 @@ export default function LoginPage() {
           style={state?.error ? { animation: "shake 0.4s" } : undefined}
         >
           <div>
-            <label className="label" htmlFor="password">Password</label>
+            <label className="label" htmlFor="password">Password or crew PIN</label>
             <input
               id="password"
               name="password"
@@ -33,7 +33,7 @@ export default function LoginPage() {
               autoFocus
               autoComplete="current-password"
               className="input"
-              placeholder="Enter dashboard password"
+              placeholder="Dashboard password or your PIN"
             />
           </div>
           {state?.error && (

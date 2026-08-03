@@ -200,6 +200,9 @@ model Worker {
   defaultPay Decimal? @db.Decimal(10, 2)
   payNote    String?
   active     Boolean  @default(true)
+  /// sha256 of the crew login PIN (see lib/auth.ts pinHash). Null = no crew access.
+  /// Unique so a PIN identifies exactly one worker at login.
+  pinHash    String?  @unique
   createdAt  DateTime @default(now())
 
   jobs     Job[]

@@ -12,6 +12,7 @@ export type WorkerDefaults = {
   defaultPay?: number | null;
   payNote?: string | null;
   active?: boolean;
+  hasPin?: boolean;
 };
 
 export default function WorkerForm({
@@ -46,13 +47,37 @@ export default function WorkerForm({
         </Field>
       </FormGrid>
 
+      <Field label={defaults.hasPin ? "Crew PIN (set — enter a new one to change it)" : "Crew PIN (4 to 8 digits)"}>
+        <input
+          name="pin"
+          inputMode="numeric"
+          pattern="\d{4,8}"
+          autoComplete="off"
+          className="input"
+          placeholder={defaults.hasPin ? "Leave blank to keep the current PIN" : "e.g. 4821"}
+        />
+        <p className="text-[12px] text-[var(--mut)] mt-1.5">
+          With a PIN they log in at the same page you do and see only their own jobs. No money, ever.
+        </p>
+      </Field>
+
       {isEdit && (
-        <Field label="Active">
-          <label className="flex items-center gap-2.5 text-[13.5px] text-[var(--sec)]">
-            <input type="checkbox" name="active" defaultChecked={defaults.active ?? true} className="accent-[var(--teal)] w-4 h-4" />
-            Currently working for you
-          </label>
-        </Field>
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <Field label="Active">
+            <label className="flex items-center gap-2.5 text-[13.5px] text-[var(--sec)]">
+              <input type="checkbox" name="active" defaultChecked={defaults.active ?? true} className="accent-[var(--teal)] w-4 h-4" />
+              Currently working for you
+            </label>
+          </Field>
+          {defaults.hasPin && (
+            <Field label="Crew login">
+              <label className="flex items-center gap-2.5 text-[13.5px] text-[var(--sec)]">
+                <input type="checkbox" name="clearPin" className="accent-[var(--teal)] w-4 h-4" />
+                Remove crew login
+              </label>
+            </Field>
+          )}
+        </div>
       )}
 
       <div className="flex justify-end gap-2 pt-1">

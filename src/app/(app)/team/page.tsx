@@ -139,7 +139,10 @@ export default async function TeamPage({
                     {w.name.charAt(0).toUpperCase()}
                   </span>
                   <div>
-                    <p className="font-semibold text-[15px]">{w.name}{!w.active ? " (inactive)" : ""}</p>
+                    <p className="font-semibold text-[15px] flex items-center gap-2">
+                      {w.name}{!w.active ? " (inactive)" : ""}
+                      {w.pinHash && <span className="badge badge-teal !text-[10px]" title="Has a crew PIN and can log in">Crew login</span>}
+                    </p>
                     <p className="text-[12px] text-[var(--mut)]">
                       {w.defaultPay ? `Usually ${money(w.defaultPay)}/job` : w.payNote ?? "Per job"}
                     </p>
@@ -154,6 +157,7 @@ export default async function TeamPage({
                     defaultPay: w.defaultPay == null ? null : num(w.defaultPay),
                     payNote: w.payNote,
                     active: w.active,
+                    hasPin: Boolean(w.pinHash),
                   }}
                 />
               </div>
