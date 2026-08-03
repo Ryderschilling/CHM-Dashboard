@@ -15,7 +15,6 @@
  */
 import { prisma } from "@/lib/db";
 import { gcal, calendarId, googleConnected, setState, KEY_LAST_SYNC, KEY_SYNC_NOTE, type GEvent } from "@/lib/google";
-import { matchStandard } from "@/lib/jobTime";
 import type { Job } from "@prisma/client";
 
 const TZ = "America/Chicago";
@@ -77,9 +76,7 @@ export function stripBlock(description: string | null | undefined): string {
   return (description.slice(0, i) + tail).trim();
 }
 
-type JobForPush = Omit<Job, "laborHours"> & {
-  /** Decimal off the row, or a plain number when a JobStandard filled it in. */
-  laborHours: Job["laborHours"] | number;
+type JobForPush = Job & {
   client?: { name: string } | null;
   worker?: { name: string } | null;
   tasks?: { title: string; done: boolean }[];
@@ -216,6 +213,22 @@ export async function syncCalendar(): Promise<SyncResult> {
   });
   const byEventId = new Map(existing.map((j) => [j.gcalEventId as string, j]));
 
+  // Series inheritance: link ONE occurrence of a repeating event to a client
+  // (and property) in CHM, and every sibling occurrence inherits that link
+  // here. The title matcher can then miss ("Scott and Vicki's" vs whatever
+  // the client row is named) without the rest of the series staying orphaned.
+  const linkedSiblings = await prisma.job.findMany({
+    where: { gcalSeriesId: { not: null }, clientId: { not: null } },
+    select: { gcalSeriesId: true, clientId: true, propertyId: true },
+    orderBy: { updatedAt: "desc" },
+  });
+  const seriesLink = new Map<string, { clientId: string; propertyId: string | null }>();
+  for (const j of linkedSiblings) {
+    if (j.gcalSeriesId && !seriesLink.has(j.gcalSeriesId)) {
+      seriesLink.set(j.gcalSeriesId, { clientId: j.clientId as string, propertyId: j.propertyId });
+    }
+  }
+
   const r = { ...empty };
 
   for (const e of events) {
@@ -251,14 +264,19 @@ export async function syncCalendar(): Promise<SyncResult> {
       syncedAt: now,
     };
 
+    const series = e.recurringEventId ? seriesLink.get(e.recurringEventId) : undefined;
+
     if (!job) {
-      const clientId = matchClient(e, clients, clientIds);
+      let clientId = matchClient(e, clients, clientIds);
+      if (!clientId && series) clientId = series.clientId;
       if (clientId) r.linkedClients++;
       await prisma.job.create({
         data: {
           ...scheduling,
           gcalEventId: e.id,
           clientId,
+          // Only borrow the sibling's property when it is the same client.
+          propertyId: series && clientId === series.clientId ? series.propertyId : null,
           notes: stripBlock(e.description) || null,
           status: "SCHEDULED",
         },
@@ -275,7 +293,14 @@ export async function syncCalendar(): Promise<SyncResult> {
     let clientId = job.clientId;
     if (!clientId) {
       clientId = matchClient(e, clients, clientIds);
+      if (!clientId && series) clientId = series.clientId;
       if (clientId) r.linkedClients++;
+    }
+
+    // Same for the property: backfill from a linked sibling, never replace.
+    let propertyId = job.propertyId;
+    if (!propertyId && series && clientId === series.clientId) {
+      propertyId = series.propertyId;
     }
 
     await prisma.job.update({
@@ -283,6 +308,7 @@ export async function syncCalendar(): Promise<SyncResult> {
       data: {
         ...scheduling,
         clientId,
+        propertyId,
         notes: stripBlock(e.description) || null,
         // status, laborCost, chargeAmount, workerId deliberately untouched
       },
@@ -301,7 +327,7 @@ export async function syncCalendar(): Promise<SyncResult> {
 // ---------------------------------------------------------------------- push
 
 async function loadForPush(jobId: string) {
-  const job = await prisma.job.findUnique({
+  return prisma.job.findUnique({
     where: { id: jobId },
     include: {
       client: { select: { name: true } },
@@ -309,17 +335,6 @@ async function loadForPush(jobId: string) {
       tasks: { select: { title: true, done: true }, orderBy: { createdAt: "asc" } },
     },
   });
-  if (!job || job.laborHours != null) return job;
-
-  // No measured time on this one. Fall back to the standard for this kind of
-  // job so the phone still shows how long it takes. In memory only: the Job
-  // row keeps laborHours null, because null means "nobody timed this visit".
-  const standards = await prisma.jobStandard.findMany({
-    where: { active: true },
-    select: { id: true, label: true, minutes: true, gcalSeriesId: true, titleMatch: true, active: true, clientId: true },
-  });
-  const std = matchStandard(job, standards);
-  return std ? { ...job, laborHours: std.minutes / 60 } : job;
 }
 
 /**
