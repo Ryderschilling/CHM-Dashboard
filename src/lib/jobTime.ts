@@ -3,11 +3,12 @@
  *
  * Two ideas, kept separate on purpose:
  *
- *   Job.laborHours   what this specific visit really took. Measured.
+ *   Job.laborMinutes what this specific visit really took. Measured, in
+ *                    whole minutes.
  *   JobStandard      what this kind of visit normally takes. Estimated once,
  *                    then reused forever.
  *
- * Everything on the Time page runs on "effective hours" = the measured number
+ * Everything on the Time page runs on "effective minutes" = the measured one
  * when there is one, otherwise the standard. A job with neither is not counted
  * as zero, it is counted as UNKNOWN and surfaced, because a silent zero is how
  * a business ends up believing it works fewer hours than it does.
@@ -15,7 +16,7 @@
  * Money never changes here. lib/jobValue.ts still owns what a visit is worth.
  * This file only divides that value by time.
  */
-import { num } from "@/lib/format";
+import { jobMinutes } from "@/lib/duration";
 import { valueJobs, type ValuedJobInput } from "@/lib/jobValue";
 
 export type StandardLite = {
@@ -37,7 +38,8 @@ export type TimedJobInput = ValuedJobInput & {
 export type HoursSource = "logged" | "standard" | "unknown";
 
 export type JobTime = {
-  hours: number | null;
+  /** Whole minutes. Null means neither a measurement nor a standard. */
+  minutes: number | null;
   source: HoursSource;
   /** The standard that filled the gap, when one did. */
   standardId: string | null;
@@ -73,17 +75,16 @@ export function matchStandard(
   return byTitle ?? null;
 }
 
-/** Effective hours for one job. */
+/** Effective minutes for one job. */
 export function jobTime(job: TimedJobInput, standards: StandardLite[]): JobTime {
-  if (job.laborHours != null && num(job.laborHours) > 0) {
-    return { hours: num(job.laborHours), source: "logged", standardId: null };
-  }
+  const measured = jobMinutes(job);
+  if (measured != null) return { minutes: measured, source: "logged", standardId: null };
   const std = matchStandard(job, standards);
-  if (std) return { hours: std.minutes / 60, source: "standard", standardId: std.id };
-  return { hours: null, source: "unknown", standardId: null };
+  if (std) return { minutes: std.minutes, source: "standard", standardId: std.id };
+  return { minutes: null, source: "unknown", standardId: null };
 }
 
-/** Effective hours for a whole list, keyed by job id. */
+/** Effective minutes for a whole list, keyed by job id. */
 export function timeJobs<T extends TimedJobInput>(
   jobs: T[],
   standards: StandardLite[],
@@ -101,9 +102,10 @@ export type ClientTimeRow = {
   visits: number;
   /** Visits we can put a number on. */
   timedVisits: number;
-  hours: number;
+  /** Total whole minutes across the timed visits. */
+  minutes: number;
   value: number;
-  /** value / hours, null when we have no hours to divide by. */
+  /** value per hour, null when we have no time to divide by. */
   perHour: number | null;
   /** Average minutes per visit across the visits we can time. */
   avgMinutes: number | null;
@@ -135,7 +137,7 @@ export function clientTimeRows<T extends TimedJobInput & { client?: { name?: str
         name: j.client?.name ?? "Unnamed",
         visits: 0,
         timedVisits: 0,
-        hours: 0,
+        minutes: 0,
         value: 0,
         perHour: null,
         avgMinutes: null,
@@ -145,8 +147,8 @@ export function clientTimeRows<T extends TimedJobInput & { client?: { name?: str
     const t = times.get(j.id);
     row.visits += 1;
     row.value += values.get(j.id)?.value ?? 0;
-    if (t?.hours != null) {
-      row.hours += t.hours;
+    if (t?.minutes != null) {
+      row.minutes += t.minutes;
       row.timedVisits += 1;
     } else {
       row.incomplete = true;
@@ -155,51 +157,48 @@ export function clientTimeRows<T extends TimedJobInput & { client?: { name?: str
   }
 
   for (const row of rows.values()) {
-    row.perHour = row.hours > 0 ? row.value / row.hours : null;
-    row.avgMinutes = row.timedVisits > 0 ? (row.hours / row.timedVisits) * 60 : null;
+    row.perHour = row.minutes > 0 ? row.value / (row.minutes / 60) : null;
+    row.avgMinutes = row.timedVisits > 0 ? row.minutes / row.timedVisits : null;
   }
 
   return [...rows.values()];
 }
 
-/** Total effective hours across a set of jobs, ignoring the unknowns. */
-export function totalHours(jobs: TimedJobInput[], standards: StandardLite[]): number {
+/** Total effective minutes across a set of jobs, ignoring the unknowns. */
+export function totalMinutes(jobs: TimedJobInput[], standards: StandardLite[]): number {
   const times = timeJobs(jobs, standards);
   let sum = 0;
-  for (const j of jobs) sum += times.get(j.id)?.hours ?? 0;
+  for (const j of jobs) sum += times.get(j.id)?.minutes ?? 0;
   return sum;
 }
 
 /**
- * Typical hours on each weekday, averaged over the window.
+ * Typical minutes on each weekday, averaged over the window.
  *
  * `weeks` is how many weeks of jobs went in, so Tuesday reads as "a normal
- * Tuesday costs me 3.5 hours" rather than "the next four Tuesdays total 14".
+ * Tuesday costs me 3h 30m" rather than "the next four Tuesdays total 14h".
  */
 export function weekdayLoad(
   jobs: TimedJobInput[],
   standards: StandardLite[],
   weeks: number,
-): { day: number; hours: number; visits: number }[] {
+): { day: number; minutes: number; visits: number }[] {
   const times = timeJobs(jobs, standards);
-  const buckets = Array.from({ length: 7 }, (_, day) => ({ day, hours: 0, visits: 0 }));
+  const buckets = Array.from({ length: 7 }, (_, day) => ({ day, minutes: 0, visits: 0 }));
   for (const j of jobs) {
     const b = buckets[j.date.getDay()];
-    b.hours += times.get(j.id)?.hours ?? 0;
+    b.minutes += times.get(j.id)?.minutes ?? 0;
     b.visits += 1;
   }
   const divisor = Math.max(1, weeks);
-  return buckets.map((b) => ({ day: b.day, hours: b.hours / divisor, visits: b.visits / divisor }));
+  return buckets.map((b) => ({
+    day: b.day,
+    minutes: b.minutes / divisor,
+    visits: b.visits / divisor,
+  }));
 }
 
-/** "15m", "1h 30m", "2h". Mirrors fmtHours but takes minutes. */
-export function fmtMinutes(m: number | null | undefined): string {
-  if (m == null || m <= 0) return "";
-  const whole = Math.floor(m / 60);
-  const mins = Math.round(m % 60);
-  if (whole && mins) return `${whole}h ${mins}m`;
-  if (whole) return `${whole}h`;
-  return `${mins}m`;
-}
+/** Re-export so the Time page has one import for its numbers and its labels. */
+export { fmtDur } from "@/lib/duration";
 
 export const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

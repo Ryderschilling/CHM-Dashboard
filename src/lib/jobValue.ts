@@ -15,6 +15,7 @@
  * for every retainer visit.
  */
 import { num } from "@/lib/format";
+import { jobMinutes } from "@/lib/duration";
 
 export type ValuedJobInput = {
   id: string;
@@ -22,6 +23,9 @@ export type ValuedJobInput = {
   date: Date;
   chargeAmount: unknown;
   laborCost: unknown;
+  /** Whole minutes. The real column. */
+  laborMinutes?: number | null;
+  /** Deprecated decimal hours, read only until the backfill has run. */
   laborHours?: unknown;
   client?: { cadence?: string | null; planAmount?: unknown } | null;
 };
@@ -37,7 +41,8 @@ export type JobValue = {
   labor: number;
   /** value minus labor. */
   profit: number;
-  hours: number | null;
+  /** How long it took, in whole minutes. Null means nobody timed it. */
+  minutes: number | null;
 };
 
 function monthKeyOf(d: Date): string {
@@ -63,7 +68,7 @@ export function valueJobs<T extends ValuedJobInput>(jobs: T[]): Map<string, JobV
   const out = new Map<string, JobValue>();
   for (const j of jobs) {
     const labor = num(j.laborCost);
-    const hours = j.laborHours == null ? null : num(j.laborHours);
+    const minutes = jobMinutes(j);
 
     let value = 0;
     let fromPlan = false;
@@ -78,17 +83,13 @@ export function valueJobs<T extends ValuedJobInput>(jobs: T[]): Map<string, JobV
       fromPlan = true;
     }
 
-    out.set(j.id, { value, fromPlan, planSplit, labor, profit: value - labor, hours });
+    out.set(j.id, { value, fromPlan, planSplit, labor, profit: value - labor, minutes });
   }
   return out;
 }
 
-/** Hours to a short label: 1.5 -> "1h 30m", 2 -> "2h", 0.25 -> "15m". */
-export function fmtHours(h: number | null | undefined): string {
-  if (h == null || h <= 0) return "";
-  const whole = Math.floor(h);
-  const mins = Math.round((h - whole) * 60);
-  if (whole && mins) return `${whole}h ${mins}m`;
-  if (whole) return `${whole}h`;
-  return `${mins}m`;
-}
+/**
+ * Kept as a re-export so callers have one import path for money-and-time on a
+ * job. Formatting itself lives in lib/duration.ts.
+ */
+export { fmtDur } from "@/lib/duration";

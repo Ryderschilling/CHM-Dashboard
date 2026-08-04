@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createJobStandard, updateJobStandard } from "@/actions/jobTime";
 import { Field, FormGrid } from "../ui";
+import DurationInput from "./DurationInput";
 import { useSubmit } from "./useSubmit";
 
 export type JobStandardDefaults = {
@@ -20,9 +21,6 @@ export type JobStandardDefaults = {
 type Opt = { id: string; name: string };
 type PropOpt = { id: string; clientId: string; address: string };
 
-/** One tap instead of typing the number. These cover almost every visit. */
-const QUICK = [10, 15, 20, 30, 45, 60, 90];
-
 export default function JobStandardForm({
   defaults = {},
   clients,
@@ -37,7 +35,6 @@ export default function JobStandardForm({
   const isEdit = Boolean(defaults.id);
   const { pending, onSubmit } = useSubmit(isEdit ? updateJobStandard : createJobStandard, onDone);
   const [clientId, setClientId] = useState(defaults.clientId ?? "");
-  const [minutes, setMinutes] = useState(String(defaults.minutes ?? ""));
 
   const clientProps = properties.filter((p) => p.clientId === clientId);
 
@@ -60,33 +57,10 @@ export default function JobStandardForm({
           />
         </Field>
 
-        <Field label="Minutes it takes">
-          <input
-            name="minutes"
-            type="number"
-            step="1"
-            min="1"
-            required
-            value={minutes}
-            onChange={(e) => setMinutes(e.target.value)}
-            className="input"
-            placeholder="15"
-          />
+        <Field label="How long it takes">
+          <DurationInput name="minutes" defaultMinutes={defaults.minutes ?? null} />
         </Field>
       </FormGrid>
-
-      <div className="flex flex-wrap gap-1.5 -mt-1">
-        {QUICK.map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMinutes(String(m))}
-            className={`btn btn-sm ${Number(minutes) === m ? "btn-primary" : ""}`}
-          >
-            {m}m
-          </button>
-        ))}
-      </div>
 
       <FormGrid>
         <Field label="Client">

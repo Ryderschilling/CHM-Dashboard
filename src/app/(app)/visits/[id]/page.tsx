@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getReport, loadFormOptions, minutesLabel, fmtBytes } from "@/lib/visits";
-import { valueJobs, fmtHours } from "@/lib/jobValue";
+import { valueJobs } from "@/lib/jobValue";
 import { money, num, fmtDate, toInputDate } from "@/lib/format";
 import { categoryRank, STATE_LABEL } from "@/lib/checkAreas";
 import { VisitReportActions } from "@/components/launchers";
@@ -214,7 +214,7 @@ export default async function VisitDetail({ params }: { params: Promise<{ id: st
               <p className="flex justify-between pt-1">
                 <span className="text-[var(--mut)]">Time on site</span>
                 <span className="tabular-nums font-medium">
-                  {r.minutesOnSite ? `${minutesLabel(r.minutesOnSite)} (${fmtHours(hours)})` : "Not logged"}
+                  {r.minutesOnSite ? minutesLabel(r.minutesOnSite) : "Not logged"}
                 </span>
               </p>
             </div>

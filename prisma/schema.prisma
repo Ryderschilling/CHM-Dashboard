@@ -264,7 +264,12 @@ model Job {
   worker       Worker?   @relation(fields: [workerId], references: [id], onDelete: SetNull)
   /// What was actually paid out to a worker for this job. 0 when Ryder did it.
   laborCost    Decimal   @default(0) @db.Decimal(10, 2)
-  /// Time on the job, tracked whether or not anyone was paid.
+  /// How long the job took, in WHOLE MINUTES. This is the real column.
+  /// Minutes everywhere means a 5 minute stop is 5, not 0.08, and a month of
+  /// visits adds up exactly. See lib/duration.ts.
+  laborMinutes Int?
+  /// DEPRECATED decimal hours. Read only, kept so nothing looks blank before
+  /// scripts/backfill-labor-minutes.ts has run. Safe to drop after that.
   laborHours   Decimal?  @db.Decimal(6, 2)
   /// Explicit one-off charge. Leave null when the visit is covered by a plan;
   /// lib/jobValue.ts then allocates a share of the client's monthly plan.

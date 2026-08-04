@@ -7,16 +7,16 @@ import {
   parseMonthParam,
   monthParam,
 } from "@/lib/format";
-import { fmtHours, valueJobs } from "@/lib/jobValue";
+import { valueJobs } from "@/lib/jobValue";
 import {
   clientTimeRows,
   timeJobs,
-  totalHours,
+  totalMinutes,
   weekdayLoad,
-  fmtMinutes,
   WEEKDAY_SHORT,
   type StandardLite,
 } from "@/lib/jobTime";
+import { fmtDur } from "@/lib/duration";
 import { AddJobStandardButton, JobStandardActions } from "@/components/launchers";
 import { SectionHeader, Empty } from "@/components/ui";
 import StatTile from "@/components/StatTile";
@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
  * Money answers "what did I collect". This page answers "what did it cost me
  * in hours, and is any of it worth doing". Two numbers drive it:
  *
- *   effective hours   Job.laborHours when measured, else the JobStandard.
+ *   effective time    Job.laborMinutes when measured, else the JobStandard.
  *   dollars per hour  the value lib/jobValue.ts already assigns, over hours.
  *
  * Deliberate: a job with no measured time and no standard is NOT counted as
@@ -100,12 +100,12 @@ export default async function TimePage({
   /* ── Numbers ────────────────────────────────────────────────────────── */
 
   const monthTimes = timeJobs(monthJobs, standards);
-  const monthHours = totalHours(monthJobs, standards);
+  const monthMinutes = totalMinutes(monthJobs, standards);
   // Value every job in one pass, clientless ones included, so the headline
   // rate is total work over total hours and not a subset of either.
   const monthValues = valueJobs(monthJobs);
   const monthValue = monthJobs.reduce((s, j) => s + (monthValues.get(j.id)?.value ?? 0), 0);
-  const monthPerHour = monthHours > 0 ? monthValue / monthHours : 0;
+  const monthPerHour = monthMinutes > 0 ? monthValue / (monthMinutes / 60) : 0;
 
   const rows = clientTimeRows(monthJobs, standards)
     .filter((r) => r.visits > 0)
@@ -117,11 +117,11 @@ export default async function TimePage({
     });
 
   const weekJobs = aheadJobs.filter((j) => j.date < week);
-  const weekHours = totalHours(weekJobs, standards);
-  const typicalWeek = totalHours(aheadJobs, standards) / WEEKS_AHEAD;
+  const weekMinutes = totalMinutes(weekJobs, standards);
+  const typicalWeek = totalMinutes(aheadJobs, standards) / WEEKS_AHEAD;
   const byWeekday = weekdayLoad(aheadJobs, standards, WEEKS_AHEAD);
-  const peakDay = [...byWeekday].sort((a, b) => b.hours - a.hours)[0];
-  const maxDayHours = Math.max(0.01, ...byWeekday.map((d) => d.hours));
+  const peakDay = [...byWeekday].sort((a, b) => b.minutes - a.minutes)[0];
+  const maxDayMinutes = Math.max(1, ...byWeekday.map((d) => d.minutes));
 
   // Everything on the calendar over the next four weeks that we still cannot
   // put a number on, grouped so one fix covers the whole repeating series.
@@ -199,19 +199,21 @@ export default async function TimePage({
           value={monthPerHour}
           money
           accent
-          sub={`${money(monthValue)} of work over ${fmtHours(monthHours) || "0h"}`}
+          sub={`${money(monthValue)} of work over ${fmtDur(monthMinutes) || "0m"}`}
         />
         <StatTile
-          label={`Hours in ${fmtMonth(month)}`}
-          value={monthHours}
+          label={`Time in ${fmtMonth(month)}`}
+          value={monthMinutes}
+          duration
           sub={`${monthJobs.length} visits`}
         />
         <StatTile
           label="A normal week"
           value={typicalWeek}
+          duration
           sub={
-            peakDay && peakDay.hours > 0
-              ? `Heaviest day is ${WEEKDAY_SHORT[peakDay.day]}, about ${fmtHours(peakDay.hours)}`
+            peakDay && peakDay.minutes > 0
+              ? `Heaviest day is ${WEEKDAY_SHORT[peakDay.day]}, about ${fmtDur(peakDay.minutes)}`
               : "Nothing on the calendar yet"
           }
         />
@@ -270,7 +272,7 @@ export default async function TimePage({
       <div className="card p-5 mb-5">
         <SectionHeader
           title="Where the week goes"
-          sub={`A typical day, averaged over the next ${WEEKS_AHEAD} weeks. The next 7 days are ${fmtHours(weekHours) || "empty"}.`}
+          sub={`A typical day, averaged over the next ${WEEKS_AHEAD} weeks. The next 7 days are ${fmtDur(weekMinutes) || "empty"}.`}
         />
         {typicalWeek <= 0 ? (
           <Empty text="Nothing scheduled ahead, so there is no week to measure yet." />
@@ -285,13 +287,13 @@ export default async function TimePage({
                   <div
                     className="h-full rounded-full"
                     style={{
-                      width: `${Math.round((d.hours / maxDayHours) * 100)}%`,
+                      width: `${Math.round((d.minutes / maxDayMinutes) * 100)}%`,
                       background: "linear-gradient(90deg, #12a396, #2fd4c4)",
                     }}
                   />
                 </div>
                 <span className="w-24 shrink-0 text-right text-[12.5px] tabular-nums text-[var(--sec)]">
-                  {d.hours > 0 ? fmtHours(d.hours) : "-"}
+                  {d.minutes > 0 ? fmtDur(d.minutes) : "-"}
                 </span>
               </div>
             ))}
@@ -315,7 +317,7 @@ export default async function TimePage({
                   <th className="font-medium pb-2 pr-3">Client</th>
                   <th className="font-medium pb-2 pr-3">Visits</th>
                   <th className="font-medium pb-2 pr-3">Each</th>
-                  <th className="font-medium pb-2 pr-3">Hours</th>
+                  <th className="font-medium pb-2 pr-3">Time</th>
                   <th className="font-medium pb-2 pr-3">Worth</th>
                   <th className="font-medium pb-2 pr-3">Per hour</th>
                 </tr>
@@ -348,10 +350,10 @@ export default async function TimePage({
                       </td>
                       <td className="py-2.5 pr-3 tabular-nums text-[var(--sec)]">{r.visits}</td>
                       <td className="py-2.5 pr-3 tabular-nums text-[var(--mut)]">
-                        {r.avgMinutes ? fmtMinutes(r.avgMinutes) : "-"}
+                        {r.avgMinutes ? fmtDur(r.avgMinutes) : "-"}
                       </td>
                       <td className="py-2.5 pr-3 tabular-nums text-[var(--sec)]">
-                        {r.hours > 0 ? fmtHours(r.hours) : "-"}
+                        {r.minutes > 0 ? fmtDur(r.minutes) : "-"}
                       </td>
                       <td className="py-2.5 pr-3 tabular-nums text-[var(--sec)]">
                         {money(r.value)}
@@ -413,7 +415,7 @@ export default async function TimePage({
                       )}
                     </td>
                     <td className="py-2.5 pr-3 tabular-nums text-[var(--sec)]">
-                      {fmtMinutes(s.minutes)}
+                      {fmtDur(s.minutes)}
                     </td>
                     <td className="py-2.5 pr-3">
                       {s.client ? (

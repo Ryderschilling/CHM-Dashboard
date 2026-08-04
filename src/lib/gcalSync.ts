@@ -16,6 +16,7 @@
 import { prisma } from "@/lib/db";
 import { gcal, calendarId, googleConnected, setState, KEY_LAST_SYNC, KEY_SYNC_NOTE, type GEvent } from "@/lib/google";
 import type { Job } from "@prisma/client";
+import { jobMinutes, fmtDur } from "@/lib/duration";
 
 const TZ = "America/Chicago";
 /** How far back and forward we mirror. Forward bound is what "60 days out" means. */
@@ -88,7 +89,8 @@ function buildDescription(job: JobForPush): string {
   lines.push(`Who: ${job.worker?.name ?? "Ryder"}`);
   if (job.chargeAmount != null) lines.push(`Charge: $${Number(job.chargeAmount).toFixed(2)}`);
   if (Number(job.laborCost) > 0) lines.push(`Paid out: $${Number(job.laborCost).toFixed(2)}`);
-  if (job.laborHours != null && Number(job.laborHours) > 0) lines.push(`Time: ${Number(job.laborHours)}h`);
+  const mins = jobMinutes(job);
+  if (mins) lines.push(`Time: ${fmtDur(mins)}`);
   if (job.status !== "SCHEDULED") lines.push(`Status: ${job.status}`);
   if (job.tasks?.length) {
     lines.push("Checklist:");

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { fmtDur } from "@/lib/duration";
 
 /**
  * Shared loaders for anything that renders visit reports: the /visits page,
@@ -79,9 +80,5 @@ export function fmtBytes(n: number): string {
 }
 
 export function minutesLabel(min: number | null | undefined): string {
-  if (!min) return "";
-  if (min < 60) return `${min} min`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m ? `${h}h ${m}m` : `${h}h`;
+  return fmtDur(min);
 }

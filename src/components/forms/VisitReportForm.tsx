@@ -6,6 +6,7 @@ import { createVisitReport, updateVisitReport } from "@/actions/visits";
 import { CHECK_CATEGORIES, categoryRank } from "@/lib/checkAreas";
 import { shrinkImage, fmtBytes, type Shrunk } from "@/lib/photo";
 import { Field, FormGrid } from "../ui";
+import DurationInput from "./DurationInput";
 import { IconX } from "../icons";
 import { todayInput } from "@/lib/format";
 
@@ -252,7 +253,7 @@ export default function VisitReportForm({
         </Field>
 
         <Field label="Minutes on site">
-          <input name="minutesOnSite" type="number" min="0" step="5" defaultValue={defaults.minutesOnSite ?? ""} className="input" placeholder="45" />
+          <DurationInput name="minutesOnSite" defaultMinutes={defaults.minutesOnSite ?? null} />
         </Field>
 
         <Field label="Weather" className="sm:col-span-2">

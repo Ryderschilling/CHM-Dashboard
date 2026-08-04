@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { fmtDur } from "@/lib/duration";
 
 function easeOut(t: number) {
   return 1 - Math.pow(1 - t, 3);
@@ -11,7 +12,15 @@ function easeOut(t: number) {
  * correct across soft navigations (switching months keeps this component
  * mounted, so a one-shot animation would freeze on the first month's number).
  */
-function CountUp({ value, money: isMoney }: { value: number; money?: boolean }) {
+function CountUp({
+  value,
+  money: isMoney,
+  duration: isDuration,
+}: {
+  value: number;
+  money?: boolean;
+  duration?: boolean;
+}) {
   const [display, setDisplay] = useState(0);
   const fromRef = useRef(0); // where the next animation starts
   const seenRef = useRef(false); // has the tile ever scrolled into view
@@ -57,7 +66,9 @@ function CountUp({ value, money: isMoney }: { value: number; money?: boolean }) 
   }, [value]);
 
   const hasCents = Math.abs(value % 1) >= 0.005;
-  const text = isMoney
+  const text = isDuration
+    ? fmtDur(display) || "0m"
+    : isMoney
     ? display.toLocaleString("en-US", {
         style: "currency",
         currency: "USD",
@@ -101,6 +112,7 @@ export default function StatTile({
   label,
   value,
   money,
+  duration,
   sub,
   subTone = "mut",
   accent,
@@ -109,6 +121,8 @@ export default function StatTile({
   label: string;
   value: number;
   money?: boolean;
+  /** Render the number as time: 45m, 1h 30m. `value` is whole minutes. */
+  duration?: boolean;
   sub?: string;
   subTone?: "mut" | "good" | "warn" | "bad";
   accent?: boolean;
@@ -131,7 +145,7 @@ export default function StatTile({
       )}
       <p className="eyebrow mb-2.5">{label}</p>
       <p className="stat-num text-[27px] leading-none flex items-center gap-2 flex-wrap">
-        <CountUp value={value} money={money} />
+        <CountUp value={value} money={money} duration={duration} />
         {delta && <DeltaChip pct={delta.pct} title={delta.title} />}
       </p>
       {sub && <p className={`text-[12px] mt-2.5 ${toneClass}`}>{sub}</p>}

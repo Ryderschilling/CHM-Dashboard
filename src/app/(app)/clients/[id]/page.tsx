@@ -16,7 +16,8 @@ import InvoiceCosts from "@/components/InvoiceCosts";
 import { TaskToggle, TaskDelete, NoteComposer, NoteDelete } from "@/components/TaskBits";
 import { SectionHeader, StatusBadge, Empty, CADENCE_LABEL, CATEGORY_LABEL } from "@/components/ui";
 import StatTile from "@/components/StatTile";
-import { valueJobs, fmtHours } from "@/lib/jobValue";
+import { valueJobs } from "@/lib/jobValue";
+import { fmtDur } from "@/lib/duration";
 import Reveal from "@/components/Reveal";
 import { IconChevronL } from "@/components/icons";
 
@@ -78,7 +79,7 @@ export default async function ClientDetail({
       date: j.date,
       chargeAmount: j.chargeAmount,
       laborCost: j.laborCost,
-      laborHours: j.laborHours,
+      laborMinutes: j.laborMinutes,
       client: { cadence: client.cadence, planAmount: client.planAmount },
     }))
   );
@@ -471,7 +472,7 @@ export default async function ClientDetail({
                         <p className="text-[13.5px] font-medium truncate">{j.title}</p>
                         <p className="text-[12px] text-[var(--mut)]">
                           {fmtDate(j.date)} · {j.worker?.name ?? "You"}
-                          {v?.hours ? ` · ${fmtHours(v.hours)}` : ""}
+                          {v?.minutes ? ` · ${fmtDur(v.minutes)}` : ""}
                           {v && v.value > 0 ? ` · ${money(v.value)}${v.fromPlan ? " plan" : ""}` : ""}
                           {v && v.labor > 0 ? ` · paid out ${money(v.labor)} · net ${money(v.profit)}` : ""}
                         </p>
@@ -492,7 +493,7 @@ export default async function ClientDetail({
                             status: j.status,
                             workerId: j.workerId,
                             laborCost: num(j.laborCost),
-                            laborHours: j.laborHours == null ? null : num(j.laborHours),
+                            laborMinutes: j.laborMinutes,
                             chargeAmount: j.chargeAmount == null ? null : num(j.chargeAmount),
                             durationMin: j.durationMin,
                             notes: j.notes,

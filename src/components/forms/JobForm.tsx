@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createJob, updateJob } from "@/actions/jobs";
 import { todayInput } from "@/lib/format";
 import { Field, FormGrid, JOB_TYPES } from "../ui";
+import DurationInput from "./DurationInput";
 import { useSubmit } from "./useSubmit";
 
 export type JobDefaults = {
@@ -20,7 +21,8 @@ export type JobDefaults = {
   status?: string;
   workerId?: string | null;
   laborCost?: number;
-  laborHours?: number | null;
+  /** Whole minutes. */
+  laborMinutes?: number | null;
   chargeAmount?: number | null;
   durationMin?: number | null;
   notes?: string | null;
@@ -120,8 +122,8 @@ export default function JobForm({
             <option value="CANCELED">Canceled</option>
           </select>
         </Field>
-        <Field label="Time on the job (hours)">
-          <input name="laborHours" type="number" step="0.25" min="0" defaultValue={defaults.laborHours ?? ""} className="input" placeholder="0.75" />
+        <Field label="Time on the job">
+          <DurationInput name="laborMinutes" defaultMinutes={defaults.laborMinutes} chips={false} />
         </Field>
         <Field label="Paid out ($, only if someone else did it)">
           <input name="laborCost" type="number" step="0.01" min="0" defaultValue={defaults.laborCost ?? ""} className="input" placeholder="0" />

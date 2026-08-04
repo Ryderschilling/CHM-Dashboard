@@ -7,7 +7,8 @@ import { CREW_COOKIE, crewWorkerId } from "@/lib/auth";
 import { pushJob } from "@/lib/gcalSync";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { readFindings, savePhotos } from "@/lib/reportSave";
-import { numOrNull, reqStr, str } from "./parse";
+import { reqStr, str } from "./parse";
+import { minutesFrom } from "@/lib/duration";
 
 /**
  * Actions a crew member can fire from their phone. Every one of them
@@ -76,7 +77,7 @@ export async function crewSubmitVisitReport(fd: FormData) {
   const existing = await prisma.visitReport.findUnique({ where: { jobId }, select: { id: true } });
   if (existing) throw new Error("A report is already filed for this visit.");
 
-  const minutesOnSite = numOrNull(fd, "minutesOnSite");
+  const minutesOnSite = minutesFrom(fd, "minutesOnSite") || null;
   const internal = str(fd, "internalNotes");
 
   const report = await prisma.visitReport.create({
@@ -102,7 +103,7 @@ export async function crewSubmitVisitReport(fd: FormData) {
     where: { id: jobId },
     data: {
       status: "DONE",
-      ...(minutesOnSite ? { laborHours: Number((minutesOnSite / 60).toFixed(2)) } : {}),
+      ...(minutesOnSite ? { laborMinutes: minutesOnSite } : {}),
     },
   });
   await pushJob(jobId);

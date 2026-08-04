@@ -15,6 +15,7 @@ import TaskForm, { type TaskDefaults } from "./forms/TaskForm";
 import ExpenseForm, { type ExpenseDefaults } from "./forms/ExpenseForm";
 import WorkerForm, { type WorkerDefaults } from "./forms/WorkerForm";
 import ConfirmDelete from "./forms/ConfirmDelete";
+import DurationInput from "./forms/DurationInput";
 import { useFire, useSubmit } from "./forms/useSubmit";
 import { deleteClient } from "@/actions/clients";
 import { deletePayment, markPaymentPaid, deleteExpense } from "@/actions/money";
@@ -162,14 +163,14 @@ export function AddJobButton({
 
 function CompleteJobModal({
   job,
-  suggestedHours,
+  suggestedMinutes,
   open,
   onClose,
   onFullReport,
 }: {
   job: JobDefaults & { id: string; title?: string };
-  /** From a JobStandard when nobody has timed this visit yet. */
-  suggestedHours?: number | null;
+  /** From a JobStandard when nobody has timed this visit yet. Whole minutes. */
+  suggestedMinutes?: number | null;
   open: boolean;
   onClose: () => void;
   /** Hand off to the full visit report instead: checklist, photos, PDF. */
@@ -182,11 +183,18 @@ function CompleteJobModal({
         <input type="hidden" name="id" value={job.id} />
         <p className="text-[13.5px] text-[var(--sec)] -mt-1">{job.title}</p>
         <FormGrid>
-          <Field label="Time on the job (hours)">
-            <input name="laborHours" type="number" step="0.25" min="0" autoFocus defaultValue={job.laborHours ?? suggestedHours ?? ""} className="input" placeholder="0.75" />
-            {job.laborHours == null && suggestedHours != null && (
-              <p className="text-[11.5px] text-[var(--mut)] mt-1">Standard time for this job. Change it if today was different.</p>
-            )}
+          <Field label="Time on the job">
+            <DurationInput
+              name="laborMinutes"
+              autoFocus
+              defaultMinutes={job.laborMinutes}
+              suggestedMinutes={suggestedMinutes}
+              hint={
+                job.laborMinutes == null && suggestedMinutes != null
+                  ? "Standard time for this job. Change it if today was different."
+                  : undefined
+              }
+            />
           </Field>
           <Field label="Paid out ($)">
             <input name="laborCost" type="number" step="0.01" min="0" defaultValue={job.laborCost || ""} className="input" placeholder="0 if you did it" />
@@ -230,7 +238,7 @@ export function JobActions({
   clients,
   workers,
   properties,
-  suggestedHours,
+  suggestedMinutes,
   areas,
   visitDefaults,
   visitReportId,
@@ -239,7 +247,7 @@ export function JobActions({
   clients: Opt[];
   workers: Opt[];
   properties: PropOpt[];
-  suggestedHours?: number | null;
+  suggestedMinutes?: number | null;
   /** Checklist areas, so Done can hand off to a full visit report. */
   areas?: AreaOpt[];
   visitDefaults?: VisitDefaults;
@@ -271,7 +279,7 @@ export function JobActions({
       </Modal>
       <CompleteJobModal
         job={job}
-        suggestedHours={suggestedHours}
+        suggestedMinutes={suggestedMinutes}
         open={doneOpen}
         onClose={() => setDoneOpen(false)}
         onFullReport={

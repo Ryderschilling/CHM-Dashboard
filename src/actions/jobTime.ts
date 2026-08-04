@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { bool, numOrNull, reqStr, str } from "./parse";
+import { bool, reqStr, str } from "./parse";
+import { minutesFrom } from "@/lib/duration";
 
 /**
  * Standard job durations. See the JobStandard comment in schema.prisma for why
@@ -10,8 +11,9 @@ import { bool, numOrNull, reqStr, str } from "./parse";
  */
 
 function standardData(fd: FormData) {
-  const minutes = numOrNull(fd, "minutes");
-  if (minutes == null || minutes <= 0) throw new Error("Minutes must be a number above zero");
+  const minutes = minutesFrom(fd, "minutes");
+  if (minutes == null || minutes <= 0)
+    throw new Error("Give it a time, like 15, 1h30, or 1:15");
 
   const label = reqStr(fd, "label");
 

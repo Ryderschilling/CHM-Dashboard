@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { dateOrNull, numOrNull, reqStr, str } from "./parse";
+import { minutesFrom } from "@/lib/duration";
 import { DEFAULT_CHECK_AREAS, categoryRank } from "@/lib/checkAreas";
 import { readFindings, savePhotos } from "@/lib/reportSave";
-import type { Prisma } from "@prisma/client";
 
 /* ---------------- Per-property check areas ---------------- */
 
@@ -93,9 +93,8 @@ async function syncJobFromReport(reportId: string) {
     include: { client: { select: { name: true } }, property: { select: { address: true } } },
   });
 
-  const hours = r.minutesOnSite ? Number((r.minutesOnSite / 60).toFixed(2)) : null;
   const shared = {
-    laborHours: hours as Prisma.Decimal | number | null,
+    laborMinutes: r.minutesOnSite ?? null,
     laborCost: r.laborCost ?? 0,
     chargeAmount: r.chargeAmount,
     status: "DONE" as const,
@@ -155,7 +154,7 @@ function reportCore(fd: FormData) {
     propertyId: str(fd, "propertyId"),
     jobId: str(fd, "jobId"),
     visitDate: dateOrNull(fd, "visitDate") ?? new Date(),
-    minutesOnSite: numOrNull(fd, "minutesOnSite"),
+    minutesOnSite: minutesFrom(fd, "minutesOnSite") || null,
     weather: str(fd, "weather"),
     summary: str(fd, "summary"),
     internalNotes: str(fd, "internalNotes"),

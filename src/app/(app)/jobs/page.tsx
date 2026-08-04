@@ -7,7 +7,8 @@ import StatTile from "@/components/StatTile";
 import Reveal from "@/components/Reveal";
 import CalendarSync from "@/components/CalendarSync";
 import JobChecklist from "@/components/JobChecklist";
-import { valueJobs, fmtHours } from "@/lib/jobValue";
+import { valueJobs } from "@/lib/jobValue";
+import { fmtDur } from "@/lib/duration";
 import { timeJobs, type StandardLite } from "@/lib/jobTime";
 import {
   googleConfigured,
@@ -140,7 +141,7 @@ export default async function JobsPage({
   const doneMTD = monthJobs.filter((j) => j.status === "DONE");
   const monthValue = doneMTD.reduce((s, j) => s + (monthValued.get(j.id)?.value ?? 0), 0);
   const monthLabor = doneMTD.reduce((s, j) => s + (monthValued.get(j.id)?.labor ?? 0), 0);
-  const monthHours = doneMTD.reduce((s, j) => s + (monthValued.get(j.id)?.hours ?? 0), 0);
+  const monthMinutes = doneMTD.reduce((s, j) => s + (monthValued.get(j.id)?.minutes ?? 0), 0);
 
   // --- group by day ---
   const days: { key: string; date: Date; jobs: typeof jobs }[] = [];
@@ -183,14 +184,20 @@ export default async function JobsPage({
             {j.status === "CANCELED" && <span className="badge badge-mut !text-[10px]">Canceled</span>}
           </div>
           <p className="text-[12px] text-[var(--mut)] truncate">
-            {[
-              j.client?.name ?? "No client",
-              j.location,
-              j.worker?.name,
-              v?.hours ? fmtHours(v.hours) : null,
-            ]
+            {j.client ? (
+              <Link
+                href={`/clients/${j.client.id}`}
+                className="hover:text-[var(--teal)] hover:underline underline-offset-2 transition-colors"
+              >
+                {j.client.name}
+              </Link>
+            ) : (
+              "No client"
+            )}
+            {[j.location, j.worker?.name, fmtDur(v?.minutes)]
               .filter(Boolean)
-              .join("  ·  ")}
+              .map((bit) => `  ·  ${bit}`)
+              .join("")}
           </p>
 
           {j.tasks.length > 0 ? (
@@ -247,14 +254,14 @@ export default async function JobsPage({
               status: j.status,
               workerId: j.workerId,
               laborCost: num(j.laborCost),
-              laborHours: j.laborHours == null ? null : num(j.laborHours),
+              laborMinutes: j.laborMinutes,
               chargeAmount: j.chargeAmount == null ? null : num(j.chargeAmount),
               durationMin: j.durationMin,
               notes: j.notes,
               gcalEventId: j.gcalEventId,
             }}
-            suggestedHours={
-              timed.get(j.id)?.source === "standard" ? timed.get(j.id)?.hours : null
+            suggestedMinutes={
+              timed.get(j.id)?.source === "standard" ? timed.get(j.id)?.minutes : null
             }
             areas={checkAreas}
             visitReportId={j.visitReport?.id ?? null}
@@ -266,10 +273,7 @@ export default async function JobsPage({
                     jobId: j.id,
                     visitDate: toInputDate(j.date),
                     // Start from the measured time, else this job's standard.
-                    minutesOnSite: (() => {
-                      const h = timed.get(j.id)?.hours;
-                      return h == null ? null : Math.round(h * 60);
-                    })(),
+                    minutesOnSite: timed.get(j.id)?.minutes ?? null,
                     chargeAmount: j.chargeAmount == null ? null : num(j.chargeAmount),
                     laborCost: num(j.laborCost) || null,
                   }
@@ -329,7 +333,7 @@ export default async function JobsPage({
           label="Done this month"
           value={doneMTD.length}
           accent
-          sub={monthHours > 0 ? `${fmtHours(monthHours)} on the clock` : "No time logged"}
+          sub={monthMinutes > 0 ? `${fmtDur(monthMinutes)} on the clock` : "No time logged"}
         />
         <StatTile label="Earned this month" value={monthValue} money sub="Plan share plus one-offs" />
         <StatTile label="Paid out this month" value={monthLabor} money sub="Worker labor" />

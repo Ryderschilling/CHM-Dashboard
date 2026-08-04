@@ -6,6 +6,7 @@ import { crewSubmitVisitReport } from "@/actions/crew";
 import { categoryRank } from "@/lib/checkAreas";
 import { shrinkImage, fmtBytes, type Shrunk } from "@/lib/photo";
 import { Field } from "../ui";
+import DurationInput from "./DurationInput";
 import { IconX } from "../icons";
 
 export type CrewArea = { id: string; label: string; category: string; sortOrder: number };
@@ -143,8 +144,8 @@ export default function CrewVisitReportForm({
       <input type="hidden" name="jobId" value={jobId} />
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Minutes on site">
-          <input name="minutesOnSite" type="number" min="0" step="5" inputMode="numeric" className="input" placeholder="45" />
+        <Field label="Time on site">
+          <DurationInput name="minutesOnSite" />
         </Field>
         <Field label="Weather">
           <input name="weather" className="input" placeholder="Clear, 88F" />
