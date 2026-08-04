@@ -44,6 +44,14 @@ export async function updateClient(fd: FormData) {
   revalidatePath("/", "layout");
 }
 
+/** One-click status change from the clients list. Nothing else is touched. */
+export async function setClientStatus(fd: FormData) {
+  const id = reqStr(fd, "id");
+  const status = reqStr(fd, "status") as ClientStatus;
+  await prisma.client.update({ where: { id }, data: { status } });
+  revalidatePath("/", "layout");
+}
+
 export async function deleteClient(fd: FormData) {
   const id = reqStr(fd, "id");
   await prisma.client.delete({ where: { id } });

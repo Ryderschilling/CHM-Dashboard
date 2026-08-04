@@ -2,7 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { money, num, fmtDate } from "@/lib/format";
 import { AddClientButton } from "@/components/launchers";
-import { SectionHeader, StatusBadge, Empty, CADENCE_LABEL } from "@/components/ui";
+import { SectionHeader, Empty, CADENCE_LABEL } from "@/components/ui";
+import StatusPicker from "@/components/StatusPicker";
 import Reveal from "@/components/Reveal";
 
 export const dynamic = "force-dynamic";
@@ -116,7 +117,7 @@ export default async function ClientsPage({
                           {c.cadence === "MONTHLY" && c.planAmount ? (
                             c.visitsPerMonth ? (
                               <span className="block text-[12px] text-[var(--mut)]">
-                                {c.visitsPerMonth} visits · {money(num(c.planAmount) / c.visitsPerMonth)} a visit
+                                {c.visitsPerMonth} visit{c.visitsPerMonth === 1 ? "" : "s"} a month · {money(num(c.planAmount) / c.visitsPerMonth)} a visit
                               </span>
                             ) : (
                               <span className="block text-[12px] text-[var(--warn)]">
@@ -129,7 +130,7 @@ export default async function ClientsPage({
                         <span className="text-[13px] text-[var(--mut)]">{CADENCE_LABEL[c.cadence]}</span>
                       )}
                     </td>
-                    <td className="td"><StatusBadge status={c.status} /></td>
+                    <td className="td"><StatusPicker id={c.id} status={c.status} /></td>
                     <td className="td text-right">
                       {owed > 0 ? (
                         <span className="font-semibold text-[var(--warn)] tabular-nums">{money(owed)}</span>

@@ -20,6 +20,7 @@ import { valueJobs } from "@/lib/jobValue";
 import { fmtDur } from "@/lib/duration";
 import Reveal from "@/components/Reveal";
 import { IconChevronL } from "@/components/icons";
+import StatusPicker from "@/components/StatusPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -122,7 +123,7 @@ export default async function ClientDetail({
             <h1 className="display font-semibold text-[28px] leading-none tracking-tight" style={{ fontStretch: "118%" }}>
               {client.name}
             </h1>
-            <StatusBadge status={client.status} />
+            <StatusPicker id={client.id} status={client.status} />
             {client.lockedRate && <span className="badge badge-teal">Locked rate</span>}
           </div>
           <p className="text-[13px] text-[var(--mut)] mt-2">
