@@ -60,6 +60,7 @@ export default function ClientForm({
           <select name="status" defaultValue={defaults.status ?? "ACTIVE"} className="select">
             <option value="ACTIVE">Active</option>
             <option value="LEAD">Lead</option>
+            <option value="ONE_TIME">One time</option>
             <option value="PAUSED">Paused</option>
             <option value="FORMER">Former</option>
           </select>

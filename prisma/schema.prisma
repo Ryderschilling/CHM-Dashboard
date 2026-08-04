@@ -11,6 +11,9 @@ datasource db {
 enum ClientStatus {
   LEAD
   ACTIVE
+  /// Bought once and that was it: a rock cover, a single haul-off. Not a lead,
+  /// not a former client, and deliberately not counted in MRR.
+  ONE_TIME
   PAUSED
   FORMER
 }

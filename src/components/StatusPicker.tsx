@@ -8,6 +8,7 @@ import { StatusBadge } from "./ui";
 const OPTIONS = [
   { value: "ACTIVE", label: "Active", hint: "Paying or working with you now" },
   { value: "LEAD", label: "Lead", hint: "Talking, not closed yet" },
+  { value: "ONE_TIME", label: "One time", hint: "Bought once, no plan" },
   { value: "PAUSED", label: "Paused", hint: "On hold, coming back" },
   { value: "FORMER", label: "Former", hint: "Done working together" },
 ];

@@ -12,6 +12,7 @@ const FILTERS = [
   { key: "", label: "All" },
   { key: "ACTIVE", label: "Active" },
   { key: "LEAD", label: "Leads" },
+  { key: "ONE_TIME", label: "One time" },
   { key: "PAUSED", label: "Paused" },
   { key: "FORMER", label: "Former" },
 ];

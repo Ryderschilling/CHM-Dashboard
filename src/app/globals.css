@@ -219,6 +219,11 @@
     background: rgba(47, 212, 196, 0.08);
     border-color: rgba(47, 212, 196, 0.25);
   }
+  .badge-violet {
+    color: #b39bff;
+    background: rgba(150, 122, 255, 0.10);
+    border-color: rgba(150, 122, 255, 0.28);
+  }
 
   .tr-row {
     border-bottom: 1px solid var(--border);

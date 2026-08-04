@@ -53,6 +53,7 @@ export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { cls: string; label: string }> = {
     ACTIVE: { cls: "badge-good", label: "Active" },
     LEAD: { cls: "badge-teal", label: "Lead" },
+    ONE_TIME: { cls: "badge-violet", label: "One time" },
     PAUSED: { cls: "badge-warn", label: "Paused" },
     FORMER: { cls: "badge-mut", label: "Former" },
     PAID: { cls: "badge-good", label: "Paid" },
