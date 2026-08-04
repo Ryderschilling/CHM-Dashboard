@@ -32,11 +32,11 @@ export default async function VisitDetail({ params }: { params: Promise<{ id: st
   const [plan, monthJobs] = await Promise.all([
     prisma.client.findUnique({
       where: { id: r.clientId },
-      select: { planName: true, planAmount: true, cadence: true },
+      select: { planName: true, planAmount: true, cadence: true, visitsPerMonth: true },
     }),
     prisma.job.findMany({
       where: { clientId: r.clientId, date: { gte: mStart, lt: mEnd }, status: { not: "CANCELED" } },
-      include: { client: { select: { cadence: true, planAmount: true } } },
+      include: { client: { select: { cadence: true, planAmount: true, visitsPerMonth: true } } },
     }),
   ]);
   const v = r.jobId ? valueJobs(monthJobs).get(r.jobId) ?? null : null;
@@ -184,9 +184,13 @@ export default async function VisitDetail({ params }: { params: Promise<{ id: st
                   )}
                 </div>
                 <p className="text-[12px] text-[var(--mut)] mt-2.5">
-                  {v.fromPlan
-                    ? `${plan?.planName ? `${plan.planName}, ` : ""}${money(num(plan?.planAmount))} a month split across ${v.planSplit} visit${v.planSplit === 1 ? "" : "s"} this month`
-                    : "Charged directly on this visit, not drawn from a plan"}
+                  {v.kind === "plan"
+                    ? `${plan?.planName ? `${plan.planName}, ` : ""}${money(num(plan?.planAmount))} a month split across ${v.planSplit} visit${v.planSplit === 1 ? "" : "s"}${v.splitDeclared ? "" : " on the calendar this month"}`
+                    : v.kind === "rate"
+                      ? `${money(num(plan?.planAmount))} a visit, their standing rate`
+                      : v.kind === "over"
+                        ? `The plan's ${v.planSplit} visits this month are already accounted for, so this one is worth $0 unless you put a charge on it`
+                        : "Charged directly on this visit, not drawn from a plan"}
                   {hours ? ` · ${minutesLabel(r.minutesOnSite)} on site` : " · no time logged yet"}
                   {outOfPocket > 0 ? ` · ${money(outOfPocket)} out of pocket` : ""}
                 </p>

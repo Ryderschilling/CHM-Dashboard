@@ -80,7 +80,11 @@ export default async function ClientDetail({
       chargeAmount: j.chargeAmount,
       laborCost: j.laborCost,
       laborMinutes: j.laborMinutes,
-      client: { cadence: client.cadence, planAmount: client.planAmount },
+      client: {
+        cadence: client.cadence,
+        planAmount: client.planAmount,
+        visitsPerMonth: client.visitsPerMonth,
+      },
     }))
   );
 
@@ -95,6 +99,7 @@ export default async function ClientDetail({
     planName: client.planName,
     planAmount: client.planAmount == null ? null : num(client.planAmount),
     cadence: client.cadence,
+    visitsPerMonth: client.visitsPerMonth,
     lockedRate: client.lockedRate,
     lockedUntil: toInputDate(client.lockedUntil),
     startDate: toInputDate(client.startDate),
@@ -125,6 +130,13 @@ export default async function ClientDetail({
               client.planName && client.planAmount
                 ? `${client.planName} · ${money(client.planAmount)} ${CADENCE_LABEL[client.cadence]?.toLowerCase()}`
                 : client.planName,
+              client.cadence === "MONTHLY" && client.planAmount && client.visitsPerMonth
+                ? `${client.visitsPerMonth} visits a month · ${money(num(client.planAmount) / client.visitsPerMonth)} a visit`
+                : client.cadence === "MONTHLY" && client.planAmount
+                  ? "visits a month not set"
+                  : client.cadence !== "MONTHLY" && client.planAmount
+                    ? `${money(client.planAmount)} a visit`
+                    : null,
               client.community,
               client.startDate ? `since ${fmtDate(client.startDate)}` : null,
             ]
@@ -473,7 +485,7 @@ export default async function ClientDetail({
                         <p className="text-[12px] text-[var(--mut)]">
                           {fmtDate(j.date)} · {j.worker?.name ?? "You"}
                           {v?.minutes ? ` · ${fmtDur(v.minutes)}` : ""}
-                          {v && v.value > 0 ? ` · ${money(v.value)}${v.fromPlan ? " plan" : ""}` : ""}
+                          {v && v.value > 0 ? ` · ${money(v.value)}${v.kind === "plan" ? " plan" : v.kind === "rate" ? " a visit" : ""}` : v?.kind === "over" ? " · over plan" : ""}
                           {v && v.labor > 0 ? ` · paid out ${money(v.labor)} · net ${money(v.profit)}` : ""}
                         </p>
                       </div>

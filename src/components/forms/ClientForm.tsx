@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { createClient, updateClient } from "@/actions/clients";
+import { money } from "@/lib/format";
 import { Field, FormGrid } from "../ui";
 import { useSubmit } from "./useSubmit";
 
@@ -14,6 +16,7 @@ export type ClientDefaults = {
   community?: string | null;
   planName?: string | null;
   planAmount?: number | null;
+  visitsPerMonth?: number | null;
   cadence?: string;
   lockedRate?: boolean;
   lockedUntil?: string;
@@ -34,6 +37,16 @@ export default function ClientForm({
 }) {
   const isEdit = Boolean(defaults.id);
   const { pending, onSubmit } = useSubmit(isEdit ? updateClient : createClient, onDone);
+
+  // The money fields change meaning with the cadence, so the labels and the
+  // preview line follow it live instead of making Ryder remember the rule.
+  const [cadence, setCadence] = useState(defaults.cadence ?? "MONTHLY");
+  const [amount, setAmount] = useState(String(defaults.planAmount ?? ""));
+  const [visits, setVisits] = useState(String(defaults.visitsPerMonth ?? ""));
+  const monthly = cadence === "MONTHLY";
+  const amt = Number(amount);
+  const vis = Number(visits);
+  const perVisit = monthly && amt > 0 && vis > 0 ? amt / vis : null;
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -83,16 +96,44 @@ export default function ClientForm({
               {PLAN_NAMES.map((p) => <option key={p} value={p} />)}
             </datalist>
           </Field>
-          <Field label="Amount ($)">
-            <input name="planAmount" type="number" step="0.01" min="0" defaultValue={defaults.planAmount ?? ""} className="input" placeholder="150" />
-          </Field>
           <Field label="Billing cadence">
-            <select name="cadence" defaultValue={defaults.cadence ?? "MONTHLY"} className="select">
+            <select
+              name="cadence"
+              value={cadence}
+              onChange={(e) => setCadence(e.target.value)}
+              className="select"
+            >
               <option value="MONTHLY">Monthly</option>
               <option value="PER_VISIT">Per visit</option>
               <option value="AD_HOC">Ad hoc</option>
             </select>
           </Field>
+          <Field label={monthly ? "Amount a month ($)" : "Rate per visit ($)"}>
+            <input
+              name="planAmount"
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="input"
+              placeholder={monthly ? "150" : "20"}
+            />
+          </Field>
+          {monthly && (
+            <Field label="Visits a month">
+              <input
+                name="visitsPerMonth"
+                type="number"
+                step="1"
+                min="1"
+                value={visits}
+                onChange={(e) => setVisits(e.target.value)}
+                className="input"
+                placeholder="4"
+              />
+            </Field>
+          )}
           <Field label="Client since">
             <input name="startDate" type="date" defaultValue={defaults.startDate ?? ""} className="input" />
           </Field>
@@ -106,6 +147,26 @@ export default function ClientForm({
             </label>
           </Field>
         </FormGrid>
+
+        <p className="text-[11.5px] text-[var(--mut)] mt-3 leading-relaxed">
+          {monthly ? (
+            perVisit != null ? (
+              <>
+                <span className="text-[var(--teal)] font-medium">
+                  {money(amt)} over {vis} visit{vis === 1 ? "" : "s"} = {money(perVisit)} a visit.
+                </span>{" "}
+                Every visit this month is worth that, whatever the calendar looks
+                like. Visit {vis + 1} and beyond shows $0 and gets tagged over plan,
+                because the plan does not pay twice. Put a one-off charge on it if
+                you billed for it separately.
+              </>
+            ) : (
+              "Set visits a month and every visit gets a real dollar value: the monthly amount divided by that number. Leave it blank and it falls back to counting whatever is on the calendar that month, which moves around."
+            )
+          ) : (
+            "Off plan, so the amount is a flat rate per visit. Set it once and every job for this client is worth that much without typing a charge. A one-off charge on a job still overrides it."
+          )}
+        </p>
       </div>
 
       <FormGrid>

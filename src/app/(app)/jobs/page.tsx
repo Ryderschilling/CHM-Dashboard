@@ -90,7 +90,7 @@ export default async function JobsPage({
       prisma.job.findMany({
         where: { ...whereWho, ...whereDate },
         include: {
-          client: { select: { id: true, name: true, cadence: true, planAmount: true } },
+          client: { select: { id: true, name: true, cadence: true, planAmount: true, visitsPerMonth: true } },
           worker: { select: { id: true, name: true } },
           tasks: { select: { id: true, title: true, done: true }, orderBy: { createdAt: "asc" } },
           visitReport: { select: { id: true } },
@@ -101,7 +101,7 @@ export default async function JobsPage({
       // Separate query so the tiles always mean "this month", whatever view is on.
       prisma.job.findMany({
         where: { date: { gte: thisMonth } },
-        include: { client: { select: { cadence: true, planAmount: true } } },
+        include: { client: { select: { cadence: true, planAmount: true, visitsPerMonth: true } } },
       }),
       prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
       prisma.worker.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -225,12 +225,23 @@ export default async function JobsPage({
               <p className="text-[13px] font-semibold tabular-nums">{money(v.profit)}</p>
               <p className="text-[11px] text-[var(--mut)] tabular-nums">
                 {money(v.value)}
-                {v.fromPlan && v.planSplit > 1 ? ` plan ÷${v.planSplit}` : v.fromPlan ? " plan" : ""}
+                {v.kind === "plan" && v.planSplit > 1 ? ` plan ÷${v.planSplit}` : ""}
+                {v.kind === "plan" && v.planSplit <= 1 ? " plan" : ""}
+                {v.kind === "rate" ? " a visit" : ""}
                 {v.labor > 0 ? ` − ${money(v.labor)}` : ""}
               </p>
             </>
+          ) : v?.kind === "over" ? (
+            <>
+              <span className="badge badge-warn !text-[10px]">over plan</span>
+              <p className="text-[11px] text-[var(--mut)] mt-1">
+                {v.planSplit} a month already used
+              </p>
+            </>
           ) : (
-            <span className="text-[12px] text-[var(--mut)]">no charge</span>
+            <span className="text-[12px] text-[var(--mut)]">
+              {j.client ? "no rate set" : "no client"}
+            </span>
           )}
         </div>
 

@@ -113,6 +113,17 @@ export default async function ClientsPage({
                             {c.planAmount ? `${money(c.planAmount)} ${CADENCE_LABEL[c.cadence]?.toLowerCase()}` : CADENCE_LABEL[c.cadence]}
                             {c.lockedRate ? " · locked" : ""}
                           </span>
+                          {c.cadence === "MONTHLY" && c.planAmount ? (
+                            c.visitsPerMonth ? (
+                              <span className="block text-[12px] text-[var(--mut)]">
+                                {c.visitsPerMonth} visits · {money(num(c.planAmount) / c.visitsPerMonth)} a visit
+                              </span>
+                            ) : (
+                              <span className="block text-[12px] text-[var(--warn)]">
+                                visits a month not set
+                              </span>
+                            )
+                          ) : null}
                         </>
                       ) : (
                         <span className="text-[13px] text-[var(--mut)]">{CADENCE_LABEL[c.cadence]}</span>

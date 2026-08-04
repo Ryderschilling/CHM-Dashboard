@@ -16,6 +16,7 @@ function clientData(fd: FormData) {
     community: str(fd, "community"),
     planName: str(fd, "planName"),
     planAmount: numOrNull(fd, "planAmount"),
+    visitsPerMonth: numOrNull(fd, "visitsPerMonth"),
     cadence: (str(fd, "cadence") ?? "MONTHLY") as BillingCadence,
     lockedRate: bool(fd, "lockedRate"),
     lockedUntil: dateOrNull(fd, "lockedUntil"),

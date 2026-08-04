@@ -62,7 +62,7 @@ export default async function TimePage({
   const week = new Date(today.getTime() + 7 * 86_400_000);
 
   const jobInclude = {
-    client: { select: { id: true, name: true, cadence: true, planAmount: true } },
+    client: { select: { id: true, name: true, cadence: true, planAmount: true, visitsPerMonth: true } },
   } as const;
 
   const [standardRows, monthJobs, aheadJobs, clients, properties] = await Promise.all([

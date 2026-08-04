@@ -127,7 +127,14 @@ model Client {
   altContact       String?
   community        String?
   planName         String?
+  /// MONTHLY: what they pay a month. PER_VISIT or AD_HOC: a flat rate per
+  /// visit. lib/jobValue.ts reads it both ways off `cadence`.
   planAmount       Decimal?       @db.Decimal(10, 2)
+  /// How many visits a month the plan is supposed to include. The divisor for
+  /// per-visit value, so $135 over 4 visits is $33.75 every month whatever the
+  /// calendar looks like. Null falls back to counting the calendar. Ignored
+  /// for anything that is not MONTHLY.
+  visitsPerMonth   Int?
   cadence          BillingCadence @default(MONTHLY)
   lockedRate       Boolean        @default(false)
   lockedUntil      DateTime?
