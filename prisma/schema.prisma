@@ -285,6 +285,11 @@ model Job {
   /// lib/jobValue.ts then allocates a share of the client's monthly plan.
   chargeAmount Decimal?  @db.Decimal(10, 2)
   durationMin  Int?
+  /// Position in that day's route, 0 first. Null means "not ordered yet" and
+  /// falls to the bottom, sorted by time. Set by the up/down arrows on /jobs.
+  /// Deliberately NOT written by the Google Calendar sync: the order of a day
+  /// is Ryder's driving decision, not something Google knows about.
+  routeOrder   Int?
   notes        String?
   /// End of the time block. Null means use durationMin, or treat as a point in time.
   endDate      DateTime?

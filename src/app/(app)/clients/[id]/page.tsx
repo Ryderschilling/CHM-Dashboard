@@ -10,13 +10,14 @@ import {
   AddJobButton,
   JobActions,
   AddTaskButton,
+  AddJobStandardButton,
 } from "@/components/launchers";
 import { PropertyCard, AddPropertyButton } from "@/components/PropertyCard";
 import InvoiceCosts from "@/components/InvoiceCosts";
 import { TaskToggle, TaskDelete, NoteComposer, NoteDelete } from "@/components/TaskBits";
 import { SectionHeader, StatusBadge, Empty, CADENCE_LABEL, CATEGORY_LABEL } from "@/components/ui";
 import StatTile from "@/components/StatTile";
-import { valueJobs } from "@/lib/jobValue";
+import { valueJobs, planCounts } from "@/lib/jobValue";
 import { fmtDur } from "@/lib/duration";
 import Reveal from "@/components/Reveal";
 import { IconChevronL } from "@/components/icons";
@@ -72,21 +73,50 @@ export default async function ClientDetail({
   });
   const costsYtd = num(costsYtdAgg._sum.amount);
 
-  // Per-visit value needs the client's plan, which lives on the client record here.
+  // Per-visit value needs the client's plan, which lives on the client record
+  // here. The whole job history goes in on purpose: a monthly plan is diluted
+  // across a calendar month, so valueJobs has to see every visit in a month to
+  // divide by the right number.
+  const planShape = {
+    cadence: client.cadence,
+    planAmount: client.planAmount,
+    visitsPerMonth: client.visitsPerMonth,
+  };
+
+  // The visible list is capped, so it cannot be trusted to count a month. Pull
+  // the complete months it touches just to get the divisors right.
+  let planDivisors = new Map<string, number>();
+  if (client.jobs.length > 0) {
+    const stamps = client.jobs.map((j) => j.date.getTime());
+    const lo = new Date(Math.min(...stamps));
+    const hi = new Date(Math.max(...stamps));
+    const spanJobs = await prisma.job.findMany({
+      where: {
+        clientId: client.id,
+        date: {
+          gte: new Date(lo.getFullYear(), lo.getMonth(), 1),
+          lt: new Date(hi.getFullYear(), hi.getMonth() + 1, 1),
+        },
+      },
+      select: { id: true, date: true, status: true, chargeAmount: true, laborCost: true },
+    });
+    planDivisors = planCounts(
+      spanJobs.map((j) => ({ ...j, clientId: client.id, client: planShape })),
+    );
+  }
+
   const jobValues = valueJobs(
     client.jobs.map((j) => ({
       id: j.id,
       clientId: client.id,
       date: j.date,
+      status: j.status,
       chargeAmount: j.chargeAmount,
       laborCost: j.laborCost,
       laborMinutes: j.laborMinutes,
-      client: {
-        cadence: client.cadence,
-        planAmount: client.planAmount,
-        visitsPerMonth: client.visitsPerMonth,
-      },
-    }))
+      client: planShape,
+    })),
+    planDivisors,
   );
 
   const clientDefaults = {
@@ -132,9 +162,9 @@ export default async function ClientDetail({
                 ? `${client.planName} · ${money(client.planAmount)} ${CADENCE_LABEL[client.cadence]?.toLowerCase()}`
                 : client.planName,
               client.cadence === "MONTHLY" && client.planAmount && client.visitsPerMonth
-                ? `${client.visitsPerMonth} visits a month · ${money(num(client.planAmount) / client.visitsPerMonth)} a visit`
+                ? `priced on ${client.visitsPerMonth} visits a month · ${money(num(client.planAmount) / client.visitsPerMonth)} a visit at that`
                 : client.cadence === "MONTHLY" && client.planAmount
-                  ? "visits a month not set"
+                  ? "no baseline visit count set"
                   : client.cadence !== "MONTHLY" && client.planAmount
                     ? `${money(client.planAmount)} a visit`
                     : null,
@@ -247,11 +277,6 @@ export default async function ClientDetail({
             <SectionHeader
               title="Visit reports"
               sub="Dated walkthroughs with area-level findings"
-              action={
-                <Link href={`/visits?client=${client.id}`} className="btn btn-sm">
-                  All visits
-                </Link>
-              }
             />
             {client.visitReports.length === 0 ? (
               <Empty text="No visit reports yet. Report a walkthrough and it lands here, on the jobs list, and in this year's record." />
@@ -472,7 +497,19 @@ export default async function ClientDetail({
               title="Jobs"
               sub="Most recent first"
               action={
-                <AddJobButton clients={allClients} workers={workers} properties={propertyOpts} fixedClientId={client.id} primary={false} />
+                <span className="inline-flex items-center gap-1.5">
+                  {/* Standard times used to live on /time. That page is gone, so the
+                      one place a standard makes sense is the client it belongs to. */}
+                  <AddJobStandardButton
+                    clients={allClients}
+                    properties={propertyOpts}
+                    primary={false}
+                    small
+                    label="Set a standard time"
+                    defaults={{ clientId: client.id }}
+                  />
+                  <AddJobButton clients={allClients} workers={workers} properties={propertyOpts} fixedClientId={client.id} primary={false} />
+                </span>
               }
             />
             {client.jobs.length ? (
@@ -486,7 +523,7 @@ export default async function ClientDetail({
                         <p className="text-[12px] text-[var(--mut)]">
                           {fmtDate(j.date)} · {j.worker?.name ?? "You"}
                           {v?.minutes ? ` · ${fmtDur(v.minutes)}` : ""}
-                          {v && v.value > 0 ? ` · ${money(v.value)}${v.kind === "plan" ? " plan" : v.kind === "rate" ? " a visit" : ""}` : v?.kind === "over" ? " · over plan" : ""}
+                          {v && v.value > 0 ? ` · ${money(v.value)}${v.kind === "plan" ? ` plan ÷ ${v.planSplit}` : v.kind === "rate" ? " a visit" : ""}` : ""}
                           {v && v.labor > 0 ? ` · paid out ${money(v.labor)} · net ${money(v.profit)}` : ""}
                         </p>
                       </div>

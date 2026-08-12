@@ -186,7 +186,7 @@ export async function getDashboard(month?: Date) {
       kind: "payment" as const,
       id: p.id,
       text: `${p.client?.name ?? "No client"}: ${num(p.amount).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })} overdue`,
-      href: "/money",
+      href: "/",
       due: p.dueDate?.toISOString() ?? null,
     })),
     ...openTasks

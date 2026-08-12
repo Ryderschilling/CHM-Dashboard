@@ -185,12 +185,10 @@ export default async function VisitDetail({ params }: { params: Promise<{ id: st
                 </div>
                 <p className="text-[12px] text-[var(--mut)] mt-2.5">
                   {v.kind === "plan"
-                    ? `${plan?.planName ? `${plan.planName}, ` : ""}${money(num(plan?.planAmount))} a month split across ${v.planSplit} visit${v.planSplit === 1 ? "" : "s"}${v.splitDeclared ? "" : " on the calendar this month"}`
+                    ? `${plan?.planName ? `${plan.planName}, ` : ""}${money(num(plan?.planAmount))} a month split across the ${v.planSplit} visit${v.planSplit === 1 ? "" : "s"} they got this month${v.planBaseline != null && v.planSplit > v.planBaseline ? `, priced for ${v.planBaseline}` : ""}`
                     : v.kind === "rate"
                       ? `${money(num(plan?.planAmount))} a visit, their standing rate`
-                      : v.kind === "over"
-                        ? `The plan's ${v.planSplit} visits this month are already accounted for, so this one is worth $0 unless you put a charge on it`
-                        : "Charged directly on this visit, not drawn from a plan"}
+                      : "Charged directly on this visit, not drawn from a plan"}
                   {hours ? ` · ${minutesLabel(r.minutesOnSite)} on site` : " · no time logged yet"}
                   {outOfPocket > 0 ? ` · ${money(outOfPocket)} out of pocket` : ""}
                 </p>

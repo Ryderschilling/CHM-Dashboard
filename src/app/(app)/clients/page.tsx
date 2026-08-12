@@ -118,11 +118,11 @@ export default async function ClientsPage({
                           {c.cadence === "MONTHLY" && c.planAmount ? (
                             c.visitsPerMonth ? (
                               <span className="block text-[12px] text-[var(--mut)]">
-                                {c.visitsPerMonth} visit{c.visitsPerMonth === 1 ? "" : "s"} a month · {money(num(c.planAmount) / c.visitsPerMonth)} a visit
+                                priced on {c.visitsPerMonth} visit{c.visitsPerMonth === 1 ? "" : "s"} a month · {money(num(c.planAmount) / c.visitsPerMonth)} a visit at that
                               </span>
                             ) : (
                               <span className="block text-[12px] text-[var(--warn)]">
-                                visits a month not set
+                                no baseline visit count set
                               </span>
                             )
                           ) : null}

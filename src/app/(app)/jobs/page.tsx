@@ -1,15 +1,16 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { money, num, fmtDate, fmtTime, toInputDate, monthStart } from "@/lib/format";
+import { num, fmtDate, fmtTime, toInputDate, monthStart } from "@/lib/format";
 import { AddJobButton, JobActions, ReportVisitButton } from "@/components/launchers";
 import { Empty } from "@/components/ui";
 import StatTile from "@/components/StatTile";
 import Reveal from "@/components/Reveal";
 import CalendarSync from "@/components/CalendarSync";
 import JobChecklist from "@/components/JobChecklist";
-import { valueJobs } from "@/lib/jobValue";
-import { fmtDur } from "@/lib/duration";
+import { fmtDur, jobMinutes } from "@/lib/duration";
 import { timeJobs, type StandardLite } from "@/lib/jobTime";
+import { routeSort } from "@/lib/route";
+import RouteOrder from "@/components/RouteOrder";
 import {
   googleConfigured,
   googleConnected,
@@ -101,7 +102,7 @@ export default async function JobsPage({
       // Separate query so the tiles always mean "this month", whatever view is on.
       prisma.job.findMany({
         where: { date: { gte: thisMonth } },
-        include: { client: { select: { cadence: true, planAmount: true, visitsPerMonth: true } } },
+        select: { id: true, status: true, laborMinutes: true, laborHours: true },
       }),
       prisma.client.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
       prisma.worker.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -134,14 +135,16 @@ export default async function JobsPage({
     }
   }
 
-  // --- money ---
-  const valued = valueJobs(jobs);
+  // --- hours ---
+  // No money on this page on purpose (2026-08-05). A plan client who also buys
+  // random extra work made per-job dollars impossible to state honestly here,
+  // so money lives on the Dashboard and on each client's page instead. What a
+  // job page owes you is: did it happen, and how long did it take.
   const timed = timeJobs(jobs, standards);
-  const monthValued = valueJobs(monthJobs);
   const doneMTD = monthJobs.filter((j) => j.status === "DONE");
-  const monthValue = doneMTD.reduce((s, j) => s + (monthValued.get(j.id)?.value ?? 0), 0);
-  const monthLabor = doneMTD.reduce((s, j) => s + (monthValued.get(j.id)?.labor ?? 0), 0);
-  const monthMinutes = doneMTD.reduce((s, j) => s + (monthValued.get(j.id)?.minutes ?? 0), 0);
+  const monthMinutes = doneMTD.reduce((sum, j) => sum + (jobMinutes(j) ?? 0), 0);
+  const monthTimed = doneMTD.filter((j) => jobMinutes(j) != null).length;
+  const noClient = jobs.filter((j) => !j.clientId).length;
 
   // --- group by day ---
   const days: { key: string; date: Date; jobs: typeof jobs }[] = [];
@@ -156,19 +159,32 @@ export default async function JobsPage({
     }
     bucket.jobs.push(j);
   }
+  // Inside a day the order is the order Ryder drives it, not the order Google
+  // happened to hand it over in. See lib/route.ts.
+  for (const d of days) d.jobs.sort(routeSort);
 
-  const jobRow = (j: (typeof jobs)[number]) => {
-    const v = valued.get(j.id);
+  const jobRow = (j: (typeof jobs)[number], i: number, arr: (typeof jobs)[number][]) => {
     const openSteps = j.tasks.filter((t) => !t.done).length;
+    const est = timed.get(j.id);
 
     return (
       <div
         key={j.id}
         className="group flex items-start gap-3 px-4 py-2.5 border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)] transition-colors"
       >
+        {/* route order */}
+        <div className="shrink-0 pt-1">
+          <RouteOrder jobId={j.id} first={i === 0} last={i === arr.length - 1} />
+        </div>
+
         {/* when */}
         <div className="shrink-0 w-[62px] pt-0.5 text-[12px] tabular-nums text-[var(--mut)]">
-          {j.allDay ? "All day" : fmtTime(j.date)}
+          <span className="block">{j.allDay ? `Stop ${i + 1}` : fmtTime(j.date)}</span>
+          {est?.minutes != null && (
+            <span className={`block text-[11px] ${est.source === "standard" ? "opacity-60" : ""}`}>
+              {fmtDur(est.minutes)}
+            </span>
+          )}
         </div>
 
         {/* what */}
@@ -194,11 +210,14 @@ export default async function JobsPage({
             ) : (
               "No client"
             )}
-            {[j.location, j.worker?.name, fmtDur(v?.minutes)]
+            {[j.location, j.worker?.name, j.jobType]
               .filter(Boolean)
               .map((bit) => `  ·  ${bit}`)
               .join("")}
           </p>
+          {j.notes && (
+            <p className="text-[12px] text-[var(--sec)] mt-0.5 whitespace-pre-line">{j.notes}</p>
+          )}
 
           {j.tasks.length > 0 ? (
             <details className="mt-1.5">
@@ -215,33 +234,6 @@ export default async function JobsPage({
             <div className="mt-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
               <JobChecklist jobId={j.id} tasks={[]} />
             </div>
-          )}
-        </div>
-
-        {/* money */}
-        <div className="shrink-0 text-right w-[112px] pt-0.5">
-          {v && v.value > 0 ? (
-            <>
-              <p className="text-[13px] font-semibold tabular-nums">{money(v.profit)}</p>
-              <p className="text-[11px] text-[var(--mut)] tabular-nums">
-                {money(v.value)}
-                {v.kind === "plan" && v.planSplit > 1 ? ` plan ÷${v.planSplit}` : ""}
-                {v.kind === "plan" && v.planSplit <= 1 ? " plan" : ""}
-                {v.kind === "rate" ? " a visit" : ""}
-                {v.labor > 0 ? ` − ${money(v.labor)}` : ""}
-              </p>
-            </>
-          ) : v?.kind === "over" ? (
-            <>
-              <span className="badge badge-warn !text-[10px]">over plan</span>
-              <p className="text-[11px] text-[var(--mut)] mt-1">
-                {v.planSplit} a month already used
-              </p>
-            </>
-          ) : (
-            <span className="text-[12px] text-[var(--mut)]">
-              {j.client ? "no rate set" : "no client"}
-            </span>
           )}
         </div>
 
@@ -344,16 +336,25 @@ export default async function JobsPage({
           label="Done this month"
           value={doneMTD.length}
           accent
-          sub={monthMinutes > 0 ? `${fmtDur(monthMinutes)} on the clock` : "No time logged"}
+          sub={
+            monthTimed < doneMTD.length
+              ? `${doneMTD.length - monthTimed} still need a time`
+              : "Every one is timed"
+          }
+          subTone={monthTimed < doneMTD.length ? "warn" : "good"}
         />
-        <StatTile label="Earned this month" value={monthValue} money sub="Plan share plus one-offs" />
-        <StatTile label="Paid out this month" value={monthLabor} money sub="Worker labor" />
         <StatTile
-          label="Profit this month"
-          value={monthValue - monthLabor}
-          money
-          sub="Earned minus labor"
-          subTone={monthValue - monthLabor >= 0 ? "good" : "bad"}
+          label="Hours this month"
+          value={monthMinutes}
+          duration
+          sub={monthTimed > 0 ? `across ${monthTimed} logged job${monthTimed === 1 ? "" : "s"}` : "Nothing logged yet"}
+        />
+        <StatTile label="Scheduled ahead" value={totalUpcoming} sub="Still to come" />
+        <StatTile
+          label="No client linked"
+          value={noClient}
+          sub={noClient > 0 ? "In this view. Link them so they count." : "Everything in view is linked"}
+          subTone={noClient > 0 ? "warn" : "good"}
         />
       </div>
 
@@ -387,7 +388,8 @@ export default async function JobsPage({
       ) : (
         <div className="space-y-3">
           {days.map((d) => {
-            const dayProfit = d.jobs.reduce((s, j) => s + (valued.get(j.id)?.profit ?? 0), 0);
+            const dayMinutes = d.jobs.reduce((s, j) => s + (timed.get(j.id)?.minutes ?? 0), 0);
+            const dayUnknown = d.jobs.filter((j) => timed.get(j.id)?.source === "unknown").length;
             const isToday = dayKey(d.date) === dayKey(today);
             return (
               <div key={d.key} className={`card overflow-hidden ${isToday ? "ring-1 ring-[var(--teal)]/40" : ""}`}>
@@ -402,8 +404,8 @@ export default async function JobsPage({
                     <span className="text-[12px] text-[var(--mut)]">{fmtDate(d.date)}</span>
                   </div>
                   <span className="text-[12px] text-[var(--mut)] tabular-nums">
-                    {d.jobs.length} {d.jobs.length === 1 ? "job" : "jobs"}
-                    {dayProfit > 0 ? ` · ${money(dayProfit)}` : ""}
+                    {d.jobs.length} {d.jobs.length === 1 ? "stop" : "stops"}
+                    {dayMinutes > 0 ? ` · ${fmtDur(dayMinutes)}${dayUnknown ? "+" : ""}` : ""}
                   </span>
                 </div>
                 <div>{d.jobs.map(jobRow)}</div>

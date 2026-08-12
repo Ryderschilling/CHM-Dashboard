@@ -177,3 +177,23 @@ export const IconClock = (p: IconProps) => (
     <polyline points="12 7 12 12 15.5 14" />
   </svg>
 );
+
+export const IconTarget = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="5" />
+    <circle cx="12" cy="12" r="1.2" />
+  </svg>
+);
+
+export const IconChevronUp = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m18 15-6-6-6 6" />
+  </svg>
+);
+
+export const IconChevronDown = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);

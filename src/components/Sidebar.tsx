@@ -6,23 +6,17 @@ import { logout } from "@/actions/auth";
 import {
   IconGrid,
   IconUsers,
-  IconDollar,
   IconWrench,
   IconTeam,
   IconCheck,
   IconShield,
-  IconDoc,
-  IconClock,
   IconLogout,
 } from "./icons";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: IconGrid },
   { href: "/clients", label: "Clients", icon: IconUsers },
-  { href: "/money", label: "Money", icon: IconDollar },
   { href: "/jobs", label: "Jobs", icon: IconWrench },
-  { href: "/visits", label: "Visits", icon: IconDoc },
-  { href: "/time", label: "Time", icon: IconClock },
   { href: "/protection", label: "Protection", icon: IconShield },
   { href: "/team", label: "Team", icon: IconTeam },
   { href: "/tasks", label: "Tasks", icon: IconCheck },

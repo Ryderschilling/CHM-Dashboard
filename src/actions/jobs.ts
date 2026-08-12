@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import type { JobStatus } from "@prisma/client";
 import { bool, dateOrNull, numOr0, numOrNull, reqStr, str } from "./parse";
 import { minutesFrom } from "@/lib/duration";
+import { routeSort } from "@/lib/route";
 import { pushJob, deleteJobEvent, syncCalendar, type SyncResult } from "@/lib/gcalSync";
 import { setState, clearState, KEY_CALENDAR, KEY_REFRESH } from "@/lib/google";
 
@@ -142,5 +143,43 @@ export async function setCalendar(fd: FormData) {
 
 export async function disconnectCalendar() {
   await clearState(KEY_REFRESH);
+  revalidatePath("/", "layout");
+}
+
+// ------------------------------------------------------------ route order
+
+/**
+ * Nudge one stop up or down inside its own day.
+ *
+ * Renumbers the whole day 0..n on every move so the order stays dense and a
+ * job that arrived from Google with no routeOrder gets one the moment Ryder
+ * touches the day. Nothing here is pushed to Google: route order is his
+ * driving decision, not a calendar fact.
+ */
+export async function moveJob(fd: FormData) {
+  const id = reqStr(fd, "id");
+  const dir = str(fd, "dir") === "down" ? 1 : -1;
+
+  const job = await prisma.job.findUnique({ where: { id }, select: { date: true } });
+  if (!job) return;
+
+  const start = new Date(job.date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start.getTime() + 86_400_000);
+
+  const day = await prisma.job.findMany({
+    where: { date: { gte: start, lt: end }, status: { not: "CANCELED" } },
+    select: { id: true, title: true, date: true, allDay: true, routeOrder: true },
+  });
+  day.sort(routeSort);
+
+  const i = day.findIndex((j) => j.id === id);
+  const k = i + dir;
+  if (i < 0 || k < 0 || k >= day.length) return;
+  [day[i], day[k]] = [day[k], day[i]];
+
+  await prisma.$transaction(
+    day.map((j, idx) => prisma.job.update({ where: { id: j.id }, data: { routeOrder: idx } })),
+  );
   revalidatePath("/", "layout");
 }

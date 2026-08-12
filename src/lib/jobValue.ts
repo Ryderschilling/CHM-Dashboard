@@ -1,30 +1,34 @@
 /**
  * What a single visit is worth, and what it leaves behind.
  *
- * Ryder does almost every job himself, so "spread" (charge minus a worker's
- * pay) was meaningless most of the time. What he actually wants per visit is:
+ * THE MODEL (set 2026-08-05, after Ryder spelled out what he actually sells):
+ * a monthly plan is a promise of PAY, not a promise of a visit count. The
+ * client pays the same $135 whether the month took four stops or nine. Visits
+ * flex with the weather, special requests, and whatever the house needs.
  *
- *   value  = what the client is paying for THIS visit
- *   profit = value minus whatever he paid someone else to do it
+ * So a plan visit is worth the plan DILUTED across every visit that month:
  *
- * There are four ways a visit gets a value, checked in this order:
+ *     value per visit = planAmount / visits that client got this month
+ *
+ * There is no allowance and nothing to exceed. An extra visit does not earn
+ * $0, it lowers what every visit that month was worth, which is exactly the
+ * signal Ryder wants: over-servicing shows up as a falling dollars-per-hour,
+ * not as a phantom unpaid job. `Client.visitsPerMonth` is now only the
+ * BASELINE he priced the plan on, carried through for variance reporting
+ * (see lib/planLedger.ts). It is never the divisor.
+ *
+ * Three ways a visit gets a value, checked in this order:
  *
  *   1. CHARGE  an explicit one-off charge on the job. Always wins, even on a
- *              plan client. This is how an extra visit or extra work gets paid.
- *   2. PLAN    a monthly client. The plan is split across the number of visits
- *              a month that client is SUPPOSED to get (Client.visitsPerMonth).
- *              $135 with 4 visits a month is $33.75 a visit, every month,
- *              whatever the calendar happens to look like.
+ *              plan client. This is how extra work gets paid on top.
+ *   2. PLAN    a monthly client. planAmount over that client's visits in the
+ *              same calendar month.
  *   3. RATE    an off-plan client (per visit or ad hoc) whose planAmount is a
  *              flat rate per visit. $20 a visit is $20, no division.
- *   4. OVER    a monthly client who already got their visits this month. Worth
- *              $0, flagged, because the plan does not pay twice. The visit
- *              still counts toward time and visit counts, so over-servicing
- *              shows up as a falling dollars-per-hour instead of hiding.
  *
- * When visitsPerMonth is not set on a monthly client, the divisor falls back
- * to however many plan-covered visits that client has that month. That is the
- * old behavior, kept so nothing changes until Ryder fills the number in.
+ * IMPORTANT: the divisor is a whole client-month. Any caller showing a window
+ * SHORTER than a month (the Jobs list, a single visit) must pass `counts`
+ * built from the full month, or every plan visit reads too high.
  */
 import { num } from "@/lib/format";
 import { jobMinutes } from "@/lib/duration";
@@ -39,6 +43,8 @@ export type ValuedJobInput = {
   laborMinutes?: number | null;
   /** Deprecated decimal hours, read only until the backfill has run. */
   laborHours?: unknown;
+  /** CANCELED visits never dilute a plan. */
+  status?: string | null;
   client?: {
     cadence?: string | null;
     planAmount?: unknown;
@@ -47,16 +53,16 @@ export type ValuedJobInput = {
 };
 
 /** Where the number came from. Drives what the row says under the money. */
-export type ValueKind = "charge" | "plan" | "rate" | "over" | "none";
+export type ValueKind = "charge" | "plan" | "rate" | "none";
 
 export type JobValue = {
   /** What this visit is worth to the business. */
   value: number;
   kind: ValueKind;
-  /** How many visits the monthly plan was split across. 0 when not a plan. */
+  /** How many visits the month's plan got diluted across. 0 when not a plan. */
   planSplit: number;
-  /** True when the divisor came from the client record, not the calendar. */
-  splitDeclared: boolean;
+  /** What the plan was priced on, when Ryder recorded it. Null when he has not. */
+  planBaseline: number | null;
   /** Paid out to a worker. */
   labor: number;
   /** value minus labor. */
@@ -65,80 +71,81 @@ export type JobValue = {
   minutes: number | null;
 };
 
-function monthKeyOf(d: Date): string {
-  return `${d.getFullYear()}-${d.getMonth()}`;
+/** Key for one client's one month. Same shape used by planCounts and valueJobs. */
+export function planKey(clientId: string, d: Date): string {
+  return `${clientId}|${d.getFullYear()}-${d.getMonth()}`;
 }
 
 const isMonthly = (c: ValuedJobInput["client"]) => c?.cadence === "MONTHLY";
 
-/**
- * Value every job in one pass. Plan allocation needs the whole set, because a
- * monthly plan is shared across that client's visits in the same month.
- */
-export function valueJobs<T extends ValuedJobInput>(jobs: T[]): Map<string, JobValue> {
-  // Group the plan-covered visits by client and month, oldest first. Order
-  // matters: with a declared visits-a-month, the earliest visits are the ones
-  // the plan pays for and anything past that is extra.
-  const buckets = new Map<string, T[]>();
-  for (const j of jobs) {
-    if (!j.clientId) continue;
-    if (j.chargeAmount != null) continue; // explicitly priced, not drawing on the plan
-    if (!isMonthly(j.client) || j.client?.planAmount == null) continue;
-    const k = `${j.clientId}|${monthKeyOf(j.date)}`;
-    const list = buckets.get(k);
-    if (list) list.push(j);
-    else buckets.set(k, [j]);
-  }
+/** True when this visit is one the monthly plan is paying for. */
+function drawsOnPlan(j: ValuedJobInput): boolean {
+  if (!j.clientId) return false;
+  if (j.status === "CANCELED") return false;
+  if (j.chargeAmount != null) return false; // priced on its own, not off the plan
+  return isMonthly(j.client) && j.client?.planAmount != null;
+}
 
-  // Rank inside each bucket. Ties on date break by id so the ranking is stable
-  // across renders and does not shuffle which visit is the paid one.
-  const rank = new Map<string, number>();
-  for (const list of buckets.values()) {
-    list.sort((a, b) => a.date.getTime() - b.date.getTime() || a.id.localeCompare(b.id));
-    list.forEach((j, i) => rank.set(j.id, i));
+/**
+ * How many plan visits each client got in each month of the set you pass.
+ *
+ * Feed this WHOLE months. Hand the result to valueJobs when the list you are
+ * rendering is narrower than a month.
+ */
+export function planCounts(jobs: ValuedJobInput[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const j of jobs) {
+    if (!drawsOnPlan(j)) continue;
+    const k = planKey(j.clientId!, j.date);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
   }
+  return counts;
+}
+
+/**
+ * Value every job in one pass.
+ *
+ * `counts` overrides the divisor, so a seven-day view can still divide by the
+ * real month. Without it the divisor is counted from `jobs` itself, which is
+ * only correct when `jobs` is a full month.
+ */
+export function valueJobs<T extends ValuedJobInput>(
+  jobs: T[],
+  counts?: Map<string, number>,
+): Map<string, JobValue> {
+  const divisors = counts ?? planCounts(jobs);
 
   const out = new Map<string, JobValue>();
   for (const j of jobs) {
     const labor = num(j.laborCost);
     const minutes = jobMinutes(j);
-    const base = { labor, minutes, profit: 0 };
+    const base = { labor, minutes, planBaseline: j.client?.visitsPerMonth ?? null };
 
     // 1. An explicit charge always wins.
     if (j.chargeAmount != null) {
       const value = num(j.chargeAmount);
-      out.set(j.id, { ...base, value, kind: "charge", planSplit: 0, splitDeclared: false, profit: value - labor });
+      out.set(j.id, { ...base, value, kind: "charge", planSplit: 0, profit: value - labor });
       continue;
     }
 
     const planAmount = j.client?.planAmount == null ? null : num(j.client.planAmount);
 
-    // 2 and 4. Monthly plan: split it, and flag anything past the allowance.
-    if (j.clientId && isMonthly(j.client) && planAmount != null) {
-      const k = `${j.clientId}|${monthKeyOf(j.date)}`;
-      const actual = buckets.get(k)?.length ?? 1;
-      const declared = j.client?.visitsPerMonth ?? null;
-      const splitDeclared = declared != null && declared > 0;
-      const split = splitDeclared ? declared! : actual;
-      const position = rank.get(j.id) ?? 0;
-
-      if (position >= split) {
-        out.set(j.id, { ...base, value: 0, kind: "over", planSplit: split, splitDeclared, profit: -labor });
-        continue;
-      }
+    // 2. Monthly plan: fixed money, diluted across the month's visits.
+    if (drawsOnPlan(j) && planAmount != null) {
+      const split = Math.max(1, divisors.get(planKey(j.clientId!, j.date)) ?? 1);
       const value = planAmount / split;
-      out.set(j.id, { ...base, value, kind: "plan", planSplit: split, splitDeclared, profit: value - labor });
+      out.set(j.id, { ...base, value, kind: "plan", planSplit: split, profit: value - labor });
       continue;
     }
 
     // 3. Off plan with a flat rate per visit.
-    if (j.clientId && planAmount != null && planAmount > 0) {
-      out.set(j.id, { ...base, value: planAmount, kind: "rate", planSplit: 0, splitDeclared: false, profit: planAmount - labor });
+    if (j.clientId && !isMonthly(j.client) && planAmount != null && planAmount > 0) {
+      out.set(j.id, { ...base, value: planAmount, kind: "rate", planSplit: 0, profit: planAmount - labor });
       continue;
     }
 
-    // 4. No client, or a client with nothing set. Worth nothing until told.
-    out.set(j.id, { ...base, value: 0, kind: "none", planSplit: 0, splitDeclared: false, profit: -labor });
+    // 4. No client, a canceled visit, or a client with nothing set.
+    out.set(j.id, { ...base, value: 0, kind: "none", planSplit: 0, profit: -labor });
   }
   return out;
 }

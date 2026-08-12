@@ -7,6 +7,9 @@ import Reveal from "@/components/Reveal";
 import BarChart from "@/components/charts/BarChart";
 import HBarList from "@/components/charts/HBarList";
 import { SectionHeader, Empty, StatusBadge } from "@/components/ui";
+import MoneyLedger from "@/components/MoneyLedger";
+import { ReportVisitButton } from "@/components/launchers";
+import { loadFormOptions } from "@/lib/visits";
 import { IconAlert, IconArrowRight, IconChevronL, IconChevronR } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -16,14 +19,18 @@ const DAY_GREETING = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "F
 export default async function Dashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ m?: string }>;
+  searchParams: Promise<{ m?: string; tab?: string; new?: string }>;
 }) {
   const sp = await searchParams;
   const month = parseMonthParam(sp.m);
   const prevMonth = new Date(month.getFullYear(), month.getMonth() - 1, 1);
   const nextMonth = new Date(month.getFullYear(), month.getMonth() + 1, 1);
 
-  const [d, calEvents] = await Promise.all([getDashboard(month), getCalendarEvents(10)]);
+  const [d, calEvents, visitOpts] = await Promise.all([
+    getDashboard(month),
+    getCalendarEvents(10),
+    loadFormOptions(),
+  ]);
   const now = new Date();
   const monthName = fmtMonth(month);
 
@@ -58,8 +65,12 @@ export default async function Dashboard({
             </h1>
           </div>
           <div className="flex gap-2">
-            <Link href="/visits?new=1" className="btn btn-primary">Report a visit</Link>
-            <Link href="/money?new=1" className="btn">Log payment</Link>
+            <ReportVisitButton
+              clients={visitOpts.clients}
+              properties={visitOpts.properties}
+              areas={visitOpts.areas}
+            />
+            <Link href={`/?m=${monthParam(month)}&new=1`} className="btn">Log payment</Link>
             <Link href="/jobs?new=1" className="btn">Add job</Link>
             <Link href="/tasks?new=1" className="btn">Add task</Link>
           </div>
@@ -78,7 +89,7 @@ export default async function Dashboard({
             {!d.isCurrentMonth && <Link href="/" className="btn btn-sm ml-1.5">This month</Link>}
           </div>
           <p className="text-[11.5px] text-[var(--mut)]">
-            Money tiles follow this month. MRR, client count, and the charts are always current.
+            Everything money follows this month. MRR, client count, and the charts are always current.
           </p>
         </div>
       </Reveal>
@@ -259,6 +270,17 @@ export default async function Dashboard({
           </div>
         </Reveal>
       </div>
+
+      {/* Invoices and expenses. Same month as everything above. */}
+      <Reveal delay={100}>
+        <div className="mb-8">
+          <SectionHeader
+            title="Invoices and expenses"
+            sub={`Everything in and out for ${monthName}. Unpaid invoices from earlier months roll into the current month so nothing gets lost.`}
+          />
+          <MoneyLedger month={month} tab={sp.tab} autoOpen={sp.new === "1"} />
+        </div>
+      </Reveal>
     </div>
   );
 }
