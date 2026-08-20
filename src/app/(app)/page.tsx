@@ -7,7 +7,6 @@ import Reveal from "@/components/Reveal";
 import BarChart from "@/components/charts/BarChart";
 import HBarList from "@/components/charts/HBarList";
 import { SectionHeader, Empty, StatusBadge } from "@/components/ui";
-import MoneyLedger from "@/components/MoneyLedger";
 import { ReportVisitButton } from "@/components/launchers";
 import { loadFormOptions } from "@/lib/visits";
 import { IconAlert, IconArrowRight, IconChevronL, IconChevronR } from "@/components/icons";
@@ -70,7 +69,7 @@ export default async function Dashboard({
               properties={visitOpts.properties}
               areas={visitOpts.areas}
             />
-            <Link href={`/?m=${monthParam(month)}&new=1`} className="btn">Log payment</Link>
+            <Link href={`/money?m=${monthParam(month)}&new=1`} className="btn">Log payment</Link>
             <Link href="/jobs?new=1" className="btn">Add job</Link>
             <Link href="/tasks?new=1" className="btn">Add task</Link>
           </div>
@@ -271,16 +270,6 @@ export default async function Dashboard({
         </Reveal>
       </div>
 
-      {/* Invoices and expenses. Same month as everything above. */}
-      <Reveal delay={100}>
-        <div className="mb-8">
-          <SectionHeader
-            title="Invoices and expenses"
-            sub={`Everything in and out for ${monthName}. Unpaid invoices from earlier months roll into the current month so nothing gets lost.`}
-          />
-          <MoneyLedger month={month} tab={sp.tab} autoOpen={sp.new === "1"} />
-        </div>
-      </Reveal>
     </div>
   );
 }

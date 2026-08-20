@@ -121,3 +121,20 @@ mark, transparent). Animations are CSS-only; no motion or chart libraries.
 Vercel, team ryder-schillings-projects. Env vars needed: DATABASE_URL,
 DIRECT_URL, DASHBOARD_PASSWORD (change it), SQUARE_ACCESS_TOKEN,
 SQUARE_LOCATION_ID, GOOGLE_CALENDAR_ICS_URLS. See README.md.
+
+---
+
+## Saving to context (hard rule)
+
+1. Immediately before ANY project_memory_write, re-read the file.
+   Never write from a copy loaded earlier in the session.
+2. Never rewrite an existing topic file to add something new.
+   Create a new topic file instead: topic_YYYY-MM-DD.md
+3. MEMORY.md: re-read it, then append exactly one index line.
+   Never reorder, reformat, or prune other lines in the same write.
+4. If the re-read shows content you did not expect, STOP.
+   Report the difference to Ryder before writing anything.
+
+Reason: every chat in a project writes to the same memory files, and a
+write overwrites the whole file. Two chats saving at once can silently
+erase each other. Only run "save to context" in one chat at a time.
